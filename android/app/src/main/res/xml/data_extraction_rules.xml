@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="com.example.qqchat" path="databases/"/>
+        <include domain="com.example.qqchat" path="shared_prefs/"/>
+    </cloud-backup>
+</data-extraction-rules>
