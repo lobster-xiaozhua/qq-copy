@@ -4,15 +4,26 @@ project(qqchat_server VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Boost
 find_package(Boost REQUIRED COMPONENTS system thread)
-find_package(MySQL REQUIRED)
-find_package(hiredis REQUIRED)
+
+# MySQL (使用 pkg-config)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(MYSQL REQUIRED mysqlclient)
+
+# hiredis
+pkg_check_modules(HIREDIS REQUIRED hiredis)
 
 include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${Boost_INCLUDE_DIRS}
-    ${MYSQL_INCLUDE_DIR}
-    ${HIREDIS_INCLUDE_DIR}
+    ${MYSQL_INCLUDE_DIRS}
+    ${HIREDIS_INCLUDE_DIRS}
+)
+
+link_directories(
+    ${MYSQL_LIBRARY_DIRS}
+    ${HIREDIS_LIBRARY_DIRS}
 )
 
 add_executable(qqchat_server
@@ -27,9 +38,14 @@ add_executable(qqchat_server
 
 target_link_libraries(qqchat_server
     ${Boost_LIBRARIES}
-    ${MYSQL_LIBRARY}
-    ${HIREDIS_LIBRARY}
+    ${MYSQL_LIBRARIES}
+    ${HIREDIS_LIBRARIES}
     pthread
+)
+
+target_compile_options(qqchat_server PRIVATE
+    ${MYSQL_CFLAGS_OTHER}
+    ${HIREDIS_CFLAGS_OTHER}
 )
 
 install(TARGETS qqchat_server DESTINATION bin)
