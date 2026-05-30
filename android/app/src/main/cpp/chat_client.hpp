@@ -19,6 +19,7 @@ public:
     using RegisterCallback = std::function<void(int error_code, int user_id)>;
     using SecurityQuestionCallback = std::function<void(int error_code, const std::string& question)>;
     using ResetPasswordCallback = std::function<void(int error_code)>;
+    using VersionCheckCallback = std::function<void(int error_code, int server_version, const std::string& update_url, const std::string& update_desc)>;
     
     ChatClient();
     ~ChatClient();
@@ -37,6 +38,7 @@ public:
     void get_security_question(const std::string& username, SecurityQuestionCallback callback);
     void reset_password(const std::string& username, const std::string& new_password,
                        const std::string& security_answer, ResetPasswordCallback callback);
+    void check_version(int client_version, VersionCheckCallback callback);
     
     void set_message_callback(MessageCallback callback);
     void set_status_callback(StatusCallback callback);
@@ -62,6 +64,7 @@ private:
     RegisterCallback register_callback_;
     SecurityQuestionCallback security_question_callback_;
     ResetPasswordCallback reset_password_callback_;
+    VersionCheckCallback version_check_callback_;
     
     std::vector<uint8_t> read_buffer_;
 };
