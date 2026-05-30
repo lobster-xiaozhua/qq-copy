@@ -228,4 +228,37 @@ bool ProtocolCodec::decode_reset_password_response(const std::vector<uint8_t>& d
     return true;
 }
 
+std::vector<uint8_t> ProtocolCodec::encode_version_check_request(int client_version) {
+    std::vector<uint8_t> data;
+    write_int32(data, client_version);
+    return encode(CommandCode::VERSION_CHECK_REQ, data);
+}
+
+bool ProtocolCodec::decode_version_check_response(const std::vector<uint8_t>& data, VersionCheckResponse& resp) {
+    if (data.size() < 6) return false;
+    
+    resp.error_code = static_cast<ErrorCode>(read_uint16(&data[0]));
+    resp.server_version = read_int32(&data[2]);
+    
+    size_t offset = 6;
+    if (offset + 2 <= data.size()) {
+        uint16_t url_len = read_uint16(&data[offset]);
+        offset += 2;
+        if (offset + url_len <= data.size()) {
+            resp.update_url = read_string(&data[offset], url_len);
+            offset += url_len;
+        }
+    }
+    
+    if (offset + 2 <= data.size()) {
+        uint16_t desc_len = read_uint16(&data[offset]);
+        offset += 2;
+        if (offset + desc_len <= data.size()) {
+            resp.update_desc = read_string(&data[offset], desc_len);
+        }
+    }
+    
+    return true;
+}
+
 } // namespace qqchat

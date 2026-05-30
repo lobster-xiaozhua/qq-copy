@@ -190,6 +190,16 @@ void ChatClient::handle_packet(const std::vector<uint8_t>& packet) {
             }
             break;
         }
+        case CommandCode::VERSION_CHECK_RESP: {
+            VersionCheckResponse resp;
+            if (ProtocolCodec::decode_version_check_response(data, resp)) {
+                std::lock_guard<std::mutex> lock(callback_mutex_);
+                if (version_check_callback_) {
+                    version_check_callback_(static_cast<int>(resp.error_code), resp.server_version, resp.update_url, resp.update_desc);
+                }
+            }
+            break;
+        }
         default:
             break;
     }
@@ -258,6 +268,16 @@ void ChatClient::reset_password(const std::string& username, const std::string& 
     
     if (socket_fd_ != -1) {
         std::vector<uint8_t> packet = ProtocolCodec::encode_reset_password_request(username, new_password, security_answer);
+        send(socket_fd_, packet.data(), packet.size(), 0);
+    }
+}
+
+void ChatClient::check_version(int client_version, VersionCheckCallback callback) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    version_check_callback_ = callback;
+    
+    if (socket_fd_ != -1) {
+        std::vector<uint8_t> packet = ProtocolCodec::encode_version_check_request(client_version);
         send(socket_fd_, packet.data(), packet.size(), 0);
     }
 }

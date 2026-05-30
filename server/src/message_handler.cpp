@@ -76,6 +76,13 @@ void MessageHandler::handle_message(std::shared_ptr<Connection> conn, const Pack
             }
             break;
         }
+        case CommandCode::VERSION_CHECK_REQ: {
+            VersionCheckRequest req;
+            if (ProtocolCodec::decode_version_check_request(packet.data, req)) {
+                handle_version_check(conn, req);
+            }
+            break;
+        }
         default:
             std::cerr << "Unknown command: " << static_cast<int>(packet.command) << std::endl;
             break;
@@ -343,6 +350,19 @@ std::string MessageHandler::sha256(const std::string& str) {
         result += buf;
     }
     return result;
+}
+
+static constexpr int SERVER_APP_VERSION = 2;
+
+void MessageHandler::handle_version_check(std::shared_ptr<Connection> conn, const VersionCheckRequest& req) {
+    VersionCheckResponse resp;
+    resp.error_code = ErrorCode::SUCCESS;
+    resp.server_version = SERVER_APP_VERSION;
+    resp.update_url = "https://github.com/lobster-xiaozhua/qq-copy/releases";
+    resp.update_desc = "新版本可用，请下载最新安装包更新";
+    
+    LOG("version_check client=" << req.client_version << " server=" << SERVER_APP_VERSION << " need_update=" << (req.client_version < SERVER_APP_VERSION));
+    send_response(conn, CommandCode::VERSION_CHECK_RESP, ProtocolCodec::encode_version_check_response(resp));
 }
 
 void MessageHandler::send_response(std::shared_ptr<Connection> conn, CommandCode command, 

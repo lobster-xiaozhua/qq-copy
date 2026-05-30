@@ -271,4 +271,19 @@ std::vector<uint8_t> ProtocolCodec::encode_reset_password_response(const ResetPa
     return buffer;
 }
 
+bool ProtocolCodec::decode_version_check_request(const std::vector<uint8_t>& data, VersionCheckRequest& req) {
+    if (data.size() < 4) return false;
+    req.client_version = read_int32(&data[0]);
+    return true;
+}
+
+std::vector<uint8_t> ProtocolCodec::encode_version_check_response(const VersionCheckResponse& resp) {
+    std::vector<uint8_t> buffer;
+    write_uint16(buffer, static_cast<uint16_t>(resp.error_code));
+    write_int32(buffer, resp.server_version);
+    write_string(buffer, resp.update_url);
+    write_string(buffer, resp.update_desc);
+    return buffer;
+}
+
 } // namespace qqchat

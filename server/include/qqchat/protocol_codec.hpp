@@ -23,7 +23,9 @@ enum class CommandCode : uint16_t {
     SECURITY_QUESTION_REQ = 0x000C,
     SECURITY_QUESTION_RESP = 0x000D,
     RESET_PASSWORD_REQ = 0x000E,
-    RESET_PASSWORD_RESP = 0x000F
+    RESET_PASSWORD_RESP = 0x000F,
+    VERSION_CHECK_REQ = 0x0010,
+    VERSION_CHECK_RESP = 0x0011
 };
 
 enum class ErrorCode : uint16_t {
@@ -118,6 +120,17 @@ struct ResetPasswordResponse {
     ErrorCode error_code;
 };
 
+struct VersionCheckRequest {
+    int client_version;
+};
+
+struct VersionCheckResponse {
+    ErrorCode error_code;
+    int server_version;
+    std::string update_url;
+    std::string update_desc;
+};
+
 struct Packet {
     uint8_t version;
     CommandCode command;
@@ -152,6 +165,9 @@ public:
     
     static bool decode_reset_password_request(const std::vector<uint8_t>& data, ResetPasswordRequest& req);
     static std::vector<uint8_t> encode_reset_password_response(const ResetPasswordResponse& resp);
+    
+    static bool decode_version_check_request(const std::vector<uint8_t>& data, VersionCheckRequest& req);
+    static std::vector<uint8_t> encode_version_check_response(const VersionCheckResponse& resp);
     
     static void write_uint16(std::vector<uint8_t>& buffer, uint16_t value);
     static void write_uint32(std::vector<uint8_t>& buffer, uint32_t value);
