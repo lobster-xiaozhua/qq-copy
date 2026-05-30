@@ -21,10 +21,14 @@ public:
     void handle_chat_message(std::shared_ptr<Connection> conn, const MessageRequest& req);
     void handle_friend_list(std::shared_ptr<Connection> conn);
     void handle_add_friend(std::shared_ptr<Connection> conn, const AddFriendRequest& req);
+    void handle_register(std::shared_ptr<Connection> conn, const RegisterRequest& req);
+    void handle_security_question(std::shared_ptr<Connection> conn, const SecurityQuestionRequest& req);
+    void handle_reset_password(std::shared_ptr<Connection> conn, const ResetPasswordRequest& req);
     
 private:
     void send_response(std::shared_ptr<Connection> conn, CommandCode command, 
                       const std::vector<uint8_t>& data);
+    std::string sha256(const std::string& str);
     
     ChatServer& server_;
     std::shared_ptr<DatabasePool> db_pool_;
