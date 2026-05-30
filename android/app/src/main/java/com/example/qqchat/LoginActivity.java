@@ -17,6 +17,8 @@ public class LoginActivity extends AppCompatActivity implements ChatService.Serv
     private EditText etUsername;
     private EditText etPassword;
     private Button btnLogin;
+    private Button btnRegister;
+    private Button btnForgotPassword;
     private ChatService chatService;
     private boolean bound = false;
 
@@ -44,6 +46,8 @@ public class LoginActivity extends AppCompatActivity implements ChatService.Serv
         etUsername = findViewById(R.id.et_username);
         etPassword = findViewById(R.id.et_password);
         btnLogin = findViewById(R.id.btn_login);
+        btnRegister = findViewById(R.id.btn_register);
+        btnForgotPassword = findViewById(R.id.btn_forgot_password);
 
         btnLogin.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -60,6 +64,22 @@ public class LoginActivity extends AppCompatActivity implements ChatService.Serv
                 } else {
                     Toast.makeText(LoginActivity.this, "正在连接服务器...", Toast.LENGTH_SHORT).show();
                 }
+            }
+        });
+
+        btnRegister.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(LoginActivity.this, RegisterActivity.class);
+                startActivity(intent);
+            }
+        });
+
+        btnForgotPassword.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(LoginActivity.this, ForgotPasswordActivity.class);
+                startActivity(intent);
             }
         });
     }
@@ -132,4 +152,13 @@ public class LoginActivity extends AppCompatActivity implements ChatService.Serv
 
     @Override
     public void onFriendListReceived(int errorCode, java.util.List<Integer> friendIds, java.util.List<String> friendNames) {}
+
+    @Override
+    public void onRegisterResult(int errorCode, int userId) {}
+
+    @Override
+    public void onSecurityQuestionResult(int errorCode, String question) {}
+
+    @Override
+    public void onResetPasswordResult(int errorCode) {}
 }
