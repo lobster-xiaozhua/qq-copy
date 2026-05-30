@@ -176,4 +176,56 @@ std::vector<uint8_t> ProtocolCodec::encode_add_friend_request(int friend_id) {
     return encode(CommandCode::ADD_FRIEND_REQ, data);
 }
 
+std::vector<uint8_t> ProtocolCodec::encode_register_request(const std::string& username, const std::string& password,
+                                                          const std::string& security_question, const std::string& security_answer) {
+    std::vector<uint8_t> data;
+    write_string(data, username);
+    write_string(data, password);
+    write_string(data, security_question);
+    write_string(data, security_answer);
+    return encode(CommandCode::REGISTER_REQ, data);
+}
+
+bool ProtocolCodec::decode_register_response(const std::vector<uint8_t>& data, RegisterResponse& resp) {
+    if (data.size() < 6) return false;
+    resp.error_code = static_cast<ErrorCode>(read_uint16(&data[0]));
+    resp.user_id = read_int32(&data[2]);
+    return true;
+}
+
+std::vector<uint8_t> ProtocolCodec::encode_security_question_request(const std::string& username) {
+    std::vector<uint8_t> data;
+    write_string(data, username);
+    return encode(CommandCode::SECURITY_QUESTION_REQ, data);
+}
+
+bool ProtocolCodec::decode_security_question_response(const std::vector<uint8_t>& data, SecurityQuestionResponse& resp) {
+    if (data.size() < 2) return false;
+    resp.error_code = static_cast<ErrorCode>(read_uint16(&data[0]));
+    size_t offset = 2;
+    if (offset < data.size()) {
+        uint16_t question_len = read_uint16(&data[offset]);
+        offset += 2;
+        if (offset + question_len <= data.size()) {
+            resp.question = read_string(&data[offset], question_len);
+        }
+    }
+    return true;
+}
+
+std::vector<uint8_t> ProtocolCodec::encode_reset_password_request(const std::string& username, const std::string& new_password,
+                                                                 const std::string& security_answer) {
+    std::vector<uint8_t> data;
+    write_string(data, username);
+    write_string(data, new_password);
+    write_string(data, security_answer);
+    return encode(CommandCode::RESET_PASSWORD_REQ, data);
+}
+
+bool ProtocolCodec::decode_reset_password_response(const std::vector<uint8_t>& data, ResetPasswordResponse& resp) {
+    if (data.size() < 2) return false;
+    resp.error_code = static_cast<ErrorCode>(read_uint16(&data[0]));
+    return true;
+}
+
 } // namespace qqchat

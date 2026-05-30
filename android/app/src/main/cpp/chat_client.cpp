@@ -160,6 +160,36 @@ void ChatClient::handle_packet(const std::vector<uint8_t>& packet) {
             }
             break;
         }
+        case CommandCode::REGISTER_RESP: {
+            RegisterResponse resp;
+            if (ProtocolCodec::decode_register_response(data, resp)) {
+                std::lock_guard<std::mutex> lock(callback_mutex_);
+                if (register_callback_) {
+                    register_callback_(static_cast<int>(resp.error_code), resp.user_id);
+                }
+            }
+            break;
+        }
+        case CommandCode::SECURITY_QUESTION_RESP: {
+            SecurityQuestionResponse resp;
+            if (ProtocolCodec::decode_security_question_response(data, resp)) {
+                std::lock_guard<std::mutex> lock(callback_mutex_);
+                if (security_question_callback_) {
+                    security_question_callback_(static_cast<int>(resp.error_code), resp.question);
+                }
+            }
+            break;
+        }
+        case CommandCode::RESET_PASSWORD_RESP: {
+            ResetPasswordResponse resp;
+            if (ProtocolCodec::decode_reset_password_response(data, resp)) {
+                std::lock_guard<std::mutex> lock(callback_mutex_);
+                if (reset_password_callback_) {
+                    reset_password_callback_(static_cast<int>(resp.error_code));
+                }
+            }
+            break;
+        }
         default:
             break;
     }
@@ -195,6 +225,39 @@ void ChatClient::get_friend_list(FriendListCallback callback) {
 void ChatClient::add_friend(int friend_id) {
     if (socket_fd_ != -1) {
         std::vector<uint8_t> packet = ProtocolCodec::encode_add_friend_request(friend_id);
+        send(socket_fd_, packet.data(), packet.size(), 0);
+    }
+}
+
+void ChatClient::register_user(const std::string& username, const std::string& password,
+                               const std::string& security_question, const std::string& security_answer,
+                               RegisterCallback callback) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    register_callback_ = callback;
+    
+    if (socket_fd_ != -1) {
+        std::vector<uint8_t> packet = ProtocolCodec::encode_register_request(username, password, security_question, security_answer);
+        send(socket_fd_, packet.data(), packet.size(), 0);
+    }
+}
+
+void ChatClient::get_security_question(const std::string& username, SecurityQuestionCallback callback) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    security_question_callback_ = callback;
+    
+    if (socket_fd_ != -1) {
+        std::vector<uint8_t> packet = ProtocolCodec::encode_security_question_request(username);
+        send(socket_fd_, packet.data(), packet.size(), 0);
+    }
+}
+
+void ChatClient::reset_password(const std::string& username, const std::string& new_password,
+                               const std::string& security_answer, ResetPasswordCallback callback) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    reset_password_callback_ = callback;
+    
+    if (socket_fd_ != -1) {
+        std::vector<uint8_t> packet = ProtocolCodec::encode_reset_password_request(username, new_password, security_answer);
         send(socket_fd_, packet.data(), packet.size(), 0);
     }
 }
