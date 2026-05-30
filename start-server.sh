@@ -13,6 +13,7 @@ echo -e "${BLUE}   QQ-Copy 服务器端一键启动${NC}"
 echo -e "${BLUE}========================================${NC}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+NPROC=$(nproc 2>/dev/null || echo 4)
 
 check_root() {
     if [[ $EUID -ne 0 ]]; then
@@ -25,8 +26,18 @@ check_root() {
     fi
 }
 
+setup_ccache() {
+    echo -e "${GREEN}[1/9] 检查 ccache...${NC}"
+    if command -v ccache &> /dev/null; then
+        ccache -M 2G &>/dev/null || true
+        echo -e "${GREEN}ccache 已启用，缓存大小: $(ccache -s -z 2>/dev/null | head -1)${NC}"
+    else
+        echo -e "${YELLOW}ccache 未安装，跳过（可提升重复编译速度）${NC}"
+    fi
+}
+
 setup_mirrors() {
-    echo -e "${GREEN}[1/8] 配置阿里镜像源...${NC}"
+    echo -e "${GREEN}[2/9] 配置阿里镜像源...${NC}"
     
     if [ -f /etc/apt/sources.list ] && [ -d /etc/apt ]; then
         if ! grep -q "mirrors.aliyun.com" /etc/apt/sources.list 2>/dev/null; then
@@ -50,49 +61,25 @@ setup_mirrors() {
 }
 
 install_dependencies() {
-    echo -e "${GREEN}[2/8] 安装系统依赖...${NC}"
+    echo -e "${GREEN}[3/9] 安装系统依赖...${NC}"
+    
+    PKGS="build-essential cmake git curl wget g++ gcc make pkg-config"
+    PKGS="$PKGS libboost-all-dev libmysqlclient-dev libhiredis-dev"
+    PKGS="$PKGS libssl-dev mysql-server redis-server ccache"
     
     if [ $NEED_SUDO -eq 1 ]; then
-        $CMD_PREFIX apt-get update -y
-        $CMD_PREFIX apt-get install -y \
-            build-essential \
-            cmake \
-            git \
-            curl \
-            wget \
-            g++ \
-            gcc \
-            make \
-            pkg-config \
-            libboost-all-dev \
-            libmysqlclient-dev \
-            libhiredis-dev \
-            mysql-server \
-            redis-server 2>&1 | tail -20
+        $CMD_PREFIX apt-get update -y -qq
+        $CMD_PREFIX apt-get install -y -qq $PKGS 2>&1 | tail -5
     else
-        apt-get update -y
-        apt-get install -y \
-            build-essential \
-            cmake \
-            git \
-            curl \
-            wget \
-            g++ \
-            gcc \
-            make \
-            pkg-config \
-            libboost-all-dev \
-            libmysqlclient-dev \
-            libhiredis-dev \
-            mysql-server \
-            redis-server 2>&1 | tail -20
+        apt-get update -y -qq
+        apt-get install -y -qq $PKGS 2>&1 | tail -5
     fi
     
     echo -e "${GREEN}基础依赖安装完成${NC}"
 }
 
 setup_database() {
-    echo -e "${GREEN}[3/8] 配置 MySQL 数据库...${NC}"
+    echo -e "${GREEN}[4/9] 配置 MySQL 数据库...${NC}"
     
     DB_USER="qqchat"
     DB_PASS="password"
@@ -172,7 +159,7 @@ setup_database() {
 }
 
 start_redis() {
-    echo -e "${GREEN}[4/8] 启动 Redis...${NC}"
+    echo -e "${GREEN}[5/9] 启动 Redis...${NC}"
     
     REDIS_STARTED=0
     
@@ -217,7 +204,7 @@ start_redis() {
 }
 
 build_server() {
-    echo -e "${GREEN}[5/8] 编译服务器...${NC}"
+    echo -e "${GREEN}[6/9] 编译服务器...${NC}"
     
     SERVER_DIR="$SCRIPT_DIR/server"
     
@@ -240,11 +227,12 @@ build_server() {
     mkdir -p build
     cd build
     
-    cmake .. -DCMAKE_BUILD_TYPE=Release
-    make -j$(nproc)
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_CCACHE=ON -DENABLE_LTO=ON
+    make -j$NPROC
     
     if [ -f "qqchat_server" ]; then
-        echo -e "${GREEN}服务器编译成功${NC}"
+        SERVER_SIZE=$(du -h qqchat_server | cut -f1)
+        echo -e "${GREEN}服务器编译成功 (${SERVER_SIZE})${NC}"
     else
         echo -e "${RED}服务器编译失败${NC}"
         exit 1
@@ -254,12 +242,12 @@ build_server() {
 }
 
 configure_server() {
-    echo -e "${GREEN}[6/8] 配置服务器...${NC}"
+    echo -e "${GREEN}[7/9] 配置服务器...${NC}"
     
     CONFIG_DIR="$SCRIPT_DIR/server/config"
     
     if [ -d "$CONFIG_DIR" ]; then
-        cp "$CONFIG_DIR/server.conf" "$CONFIG_DIR/server.conf.backup" 2>/dev/null || true
+        mkdir -p /tmp/qqchat
         
         cat > "$CONFIG_DIR/server.conf" << 'EOF'
 [server]
@@ -289,29 +277,6 @@ EOF
     fi
 }
 
-start_server() {
-    echo -e "${GREEN}[7/8] 启动服务器...${NC}"
-    
-    mkdir -p /tmp/qqchat
-    
-    SERVER_BIN="$SCRIPT_DIR/server/build/qqchat_server"
-    
-    if [ -f "$SERVER_BIN" ]; then
-        echo -e "${GREEN}========================================${NC}"
-        echo -e "${GREEN}  服务器即将启动${NC}"
-        echo -e "${GREEN}  监听端口: 8888${NC}"
-        echo -e "${GREEN}  按 Ctrl+C 停止服务器${NC}"
-        echo -e "${GREEN}========================================${NC}"
-        
-        cd "$SCRIPT_DIR"
-        exec "$SERVER_BIN" "$SCRIPT_DIR/server/config/server.conf"
-    else
-        echo -e "${RED}错误: 找不到 qqchat_server 可执行文件${NC}"
-        echo -e "${YELLOW}请先运行: $0 --build${NC}"
-        exit 1
-    fi
-}
-
 show_help() {
     echo "QQ-Copy 服务器端一键启动脚本"
     echo ""
@@ -338,6 +303,7 @@ main() {
     fi
     
     if [ "$1" == "--install" ]; then
+        setup_ccache
         setup_mirrors
         install_dependencies
         setup_database || true
@@ -348,19 +314,31 @@ main() {
     fi
     
     if [ "$1" == "--build" ]; then
+        setup_ccache
         build_server
         configure_server
         echo -e "${GREEN}编译完成！${NC}"
         exit 0
     fi
     
+    setup_ccache
     setup_mirrors
     install_dependencies
     setup_database || true
     start_redis
     build_server
     configure_server
-    start_server
+    
+    SERVER_BIN="$SCRIPT_DIR/server/build/qqchat_server"
+    
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}  服务器即将启动${NC}"
+    echo -e "${GREEN}  监听端口: 8888${NC}"
+    echo -e "${GREEN}  按 Ctrl+C 停止服务器${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    
+    cd "$SCRIPT_DIR"
+    exec "$SERVER_BIN" "$SCRIPT_DIR/server/config/server.conf"
 }
 
 main "$@"
