@@ -1,8 +1,11 @@
 package com.example.qqchat;
 
+import android.app.DownloadManager;
 import android.app.Service;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Binder;
+import android.os.Environment;
 import android.os.IBinder;
 import android.util.Log;
 
@@ -13,6 +16,7 @@ public class ChatService extends Service {
     private static final String SERVER_HOST = "192.168.1.100";
     private static final int SERVER_PORT = 8888;
 
+    private static ChatService instance;
     private final IBinder binder = new LocalBinder();
     private ServiceListener listener;
     private int currentUserId;
@@ -38,6 +42,7 @@ public class ChatService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        instance = this;
         nativeInit();
     }
 
@@ -49,7 +54,12 @@ public class ChatService extends Service {
     @Override
     public void onDestroy() {
         nativeDestroy();
+        instance = null;
         super.onDestroy();
+    }
+
+    public static ChatService getInstance() {
+        return instance;
     }
 
     public void setListener(ServiceListener listener) {

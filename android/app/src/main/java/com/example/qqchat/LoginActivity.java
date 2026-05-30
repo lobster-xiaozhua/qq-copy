@@ -16,7 +16,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
-public class LoginActivity extends AppCompatActivity implements ChatService.ServiceListener, UpdateDialogFragment.UpdateDismissListener {
+public class LoginActivity extends AppCompatActivity implements ChatService.ServiceListener {
     private EditText etUsername;
     private EditText etPassword;
     private Button btnLogin;
@@ -24,10 +24,6 @@ public class LoginActivity extends AppCompatActivity implements ChatService.Serv
     private Button btnForgotPassword;
     private ChatService chatService;
     private boolean bound = false;
-    private boolean versionChecked = false;
-    private boolean updateDialogShown = false;
-
-    private static final int CLIENT_VERSION = 2;
 
     private ServiceConnection connection = new ServiceConnection() {
         @Override
@@ -115,54 +111,12 @@ public class LoginActivity extends AppCompatActivity implements ChatService.Serv
                 if (status == 1) {
                     Toast.makeText(LoginActivity.this, "连接成功", Toast.LENGTH_SHORT).show();
                     btnLogin.setEnabled(true);
-                    
-                    if (!versionChecked) {
-                        versionChecked = true;
-                        checkAppVersion();
-                    }
                 } else {
                     Toast.makeText(LoginActivity.this, "连接失败", Toast.LENGTH_SHORT).show();
                     btnLogin.setEnabled(true);
                 }
             }
         });
-    }
-
-    private void checkAppVersion() {
-        if (chatService != null && chatService.isConnected()) {
-            chatService.checkVersion(CLIENT_VERSION);
-        }
-    }
-
-    @Override
-    public void onVersionCheckResult(int errorCode, int serverVersion, String updateUrl, String updateDesc) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (errorCode == 0 && serverVersion > CLIENT_VERSION) {
-                    if (!updateDialogShown && shouldShowUpdateDialog(serverVersion)) {
-                        updateDialogShown = true;
-                        showUpdateDialog(serverVersion, updateUrl, updateDesc);
-                    }
-                }
-            }
-        });
-    }
-
-    private boolean shouldShowUpdateDialog(int serverVersion) {
-        SharedPreferences prefs = getSharedPreferences("app_prefs", Context.MODE_PRIVATE);
-        int skipVersion = prefs.getInt("skip_version", 0);
-        return skipVersion < serverVersion;
-    }
-
-    private void showUpdateDialog(int serverVersion, String updateUrl, String updateDesc) {
-        UpdateDialogFragment dialog = UpdateDialogFragment.newInstance(serverVersion, updateUrl, updateDesc);
-        dialog.setDismissListener(this);
-        dialog.show(getSupportFragmentManager(), "update_dialog");
-    }
-
-    @Override
-    public void onUpdateDialogDismissed() {
     }
 
     @Override
@@ -205,4 +159,7 @@ public class LoginActivity extends AppCompatActivity implements ChatService.Serv
 
     @Override
     public void onResetPasswordResult(int errorCode) {}
+
+    @Override
+    public void onVersionCheckResult(int errorCode, int serverVersion, String updateUrl, String updateDesc) {}
 }
