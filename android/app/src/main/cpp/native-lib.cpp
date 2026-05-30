@@ -21,6 +21,9 @@ static jmethodID g_on_conn_status = nullptr;
 static jmethodID g_on_login_result = nullptr;
 static jmethodID g_on_message_received = nullptr;
 static jmethodID g_on_friend_list_received = nullptr;
+static jmethodID g_on_register_result = nullptr;
+static jmethodID g_on_security_question_result = nullptr;
+static jmethodID g_on_reset_password_result = nullptr;
 
 static void attach_callbacks(JNIEnv* env, jobject service) {
     std::lock_guard<std::mutex> lock(g_mutex);
@@ -31,6 +34,9 @@ static void attach_callbacks(JNIEnv* env, jobject service) {
     g_on_login_result = env->GetMethodID(g_service_class, "onLoginResult", "(IILjava/lang/String;)V");
     g_on_message_received = env->GetMethodID(g_service_class, "onMessageReceived", "(ILjava/lang/String;J)V");
     g_on_friend_list_received = env->GetMethodID(g_service_class, "onFriendListReceived", "(I[I[Ljava/lang/String;)V");
+    g_on_register_result = env->GetMethodID(g_service_class, "onRegisterResult", "(II)V");
+    g_on_security_question_result = env->GetMethodID(g_service_class, "onSecurityQuestionResult", "(ILjava/lang/String;)V");
+    g_on_reset_password_result = env->GetMethodID(g_service_class, "onResetPasswordResult", "(I)V");
 }
 
 static void detach_callbacks(JNIEnv* env) {
@@ -123,6 +129,56 @@ static void notify_friend_list(int error_code, const std::vector<std::pair<int, 
     env->CallVoidMethod(g_service_obj, g_on_friend_list_received, error_code, j_ids, j_names);
     env->DeleteLocalRef(j_ids);
     env->DeleteLocalRef(j_names);
+    if (attached) g_jvm->DetachCurrentThread();
+}
+
+static void notify_register(int error_code, int user_id) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_jvm || !g_service_obj) return;
+
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    if (g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    }
+    if (!env) return;
+
+    env->CallVoidMethod(g_service_obj, g_on_register_result, error_code, user_id);
+    if (attached) g_jvm->DetachCurrentThread();
+}
+
+static void notify_security_question(int error_code, const std::string& question) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_jvm || !g_service_obj) return;
+
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    if (g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    }
+    if (!env) return;
+
+    jstring j_question = env->NewStringUTF(question.c_str());
+    env->CallVoidMethod(g_service_obj, g_on_security_question_result, error_code, j_question);
+    env->DeleteLocalRef(j_question);
+    if (attached) g_jvm->DetachCurrentThread();
+}
+
+static void notify_reset_password(int error_code) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_jvm || !g_service_obj) return;
+
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    if (g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    }
+    if (!env) return;
+
+    env->CallVoidMethod(g_service_obj, g_on_reset_password_result, error_code);
     if (attached) g_jvm->DetachCurrentThread();
 }
 
@@ -219,6 +275,63 @@ Java_com_example_qqchat_ChatService_nativeAddFriend(JNIEnv*, jobject, jint frien
         LOGI("Adding friend: %d", friend_id);
         g_client->add_friend(friend_id);
     }
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_qqchat_ChatService_nativeRegister(JNIEnv* env, jobject, jstring username, jstring password,
+                                                   jstring security_question, jstring security_answer) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_client) return;
+
+    const char* user = env->GetStringUTFChars(username, nullptr);
+    const char* pass = env->GetStringUTFChars(password, nullptr);
+    const char* question = env->GetStringUTFChars(security_question, nullptr);
+    const char* answer = env->GetStringUTFChars(security_answer, nullptr);
+    LOGI("Register: %s", user);
+
+    g_client->register_user(user, pass, question, answer, [](int error_code, int user_id) {
+        notify_register(error_code, user_id);
+    });
+
+    env->ReleaseStringUTFChars(username, user);
+    env->ReleaseStringUTFChars(password, pass);
+    env->ReleaseStringUTFChars(security_question, question);
+    env->ReleaseStringUTFChars(security_answer, answer);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_qqchat_ChatService_nativeGetSecurityQuestion(JNIEnv* env, jobject, jstring username) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_client) return;
+
+    const char* user = env->GetStringUTFChars(username, nullptr);
+    LOGI("Get security question: %s", user);
+
+    g_client->get_security_question(user, [](int error_code, const std::string& question) {
+        notify_security_question(error_code, question);
+    });
+
+    env->ReleaseStringUTFChars(username, user);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_qqchat_ChatService_nativeResetPassword(JNIEnv* env, jobject, jstring username,
+                                                       jstring new_password, jstring security_answer) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_client) return;
+
+    const char* user = env->GetStringUTFChars(username, nullptr);
+    const char* new_pass = env->GetStringUTFChars(new_password, nullptr);
+    const char* answer = env->GetStringUTFChars(security_answer, nullptr);
+    LOGI("Reset password: %s", user);
+
+    g_client->reset_password(user, new_pass, answer, [](int error_code) {
+        notify_reset_password(error_code);
+    });
+
+    env->ReleaseStringUTFChars(username, user);
+    env->ReleaseStringUTFChars(new_password, new_pass);
+    env->ReleaseStringUTFChars(security_answer, answer);
 }
 
 JNIEXPORT void JNICALL

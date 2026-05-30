@@ -16,6 +16,9 @@ public:
     using MessageCallback = std::function<void(int from_id, const std::string& content, long long timestamp)>;
     using FriendListCallback = std::function<void(int error_code, const std::vector<std::pair<int, std::string>>& friends)>;
     using StatusCallback = std::function<void(int status)>;
+    using RegisterCallback = std::function<void(int error_code, int user_id)>;
+    using SecurityQuestionCallback = std::function<void(int error_code, const std::string& question)>;
+    using ResetPasswordCallback = std::function<void(int error_code)>;
     
     ChatClient();
     ~ChatClient();
@@ -28,6 +31,12 @@ public:
     void send_message(int to_id, const std::string& content);
     void get_friend_list(FriendListCallback callback);
     void add_friend(int friend_id);
+    void register_user(const std::string& username, const std::string& password,
+                      const std::string& security_question, const std::string& security_answer,
+                      RegisterCallback callback);
+    void get_security_question(const std::string& username, SecurityQuestionCallback callback);
+    void reset_password(const std::string& username, const std::string& new_password,
+                       const std::string& security_answer, ResetPasswordCallback callback);
     
     void set_message_callback(MessageCallback callback);
     void set_status_callback(StatusCallback callback);
@@ -50,6 +59,9 @@ private:
     MessageCallback message_callback_;
     FriendListCallback friend_list_callback_;
     StatusCallback status_callback_;
+    RegisterCallback register_callback_;
+    SecurityQuestionCallback security_question_callback_;
+    ResetPasswordCallback reset_password_callback_;
     
     std::vector<uint8_t> read_buffer_;
 };
