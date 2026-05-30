@@ -8,6 +8,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <memory>
+#include <functional>
 #include <stdexcept>
 
 namespace qqchat {
@@ -40,7 +41,7 @@ public:
                  const std::string& user, const std::string& pass, int pool_size = 10);
     ~DatabasePool();
 
-    std::unique_ptr<MYSQL, decltype(&mysql_close)> get_connection();
+    std::unique_ptr<MYSQL, std::function<void(MYSQL*)>> get_connection();
     
     bool verify_user(const std::string& username, const std::string& password, User& user);
     bool get_user_by_id(int user_id, User& user);
@@ -49,7 +50,7 @@ public:
     bool add_friend(int user_id, int friend_id);
     bool delete_friend(int user_id, int friend_id);
     bool get_friends(int user_id, std::vector<Friend>& friends);
-    bool send_message(int from_id, int to_id, const std::string& content);
+    bool send_message(int from_id, int to_id, const std::string& content, int& out_msg_id);
     bool get_messages(int user_id, int friend_id, std::vector<Message>& messages, int limit = 50);
 
 private:
@@ -65,7 +66,6 @@ private:
     std::condition_variable cv_;
     
     MYSQL* create_connection();
-    void release_connection(MYSQL* conn);
 };
 
 } // namespace qqchat

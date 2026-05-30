@@ -2,6 +2,7 @@
 #define CONNECTION_MANAGER_HPP
 
 #include <boost/asio.hpp>
+#include <deque>
 #include <memory>
 #include <unordered_map>
 #include <mutex>
@@ -64,6 +65,7 @@ private:
     
     std::vector<uint8_t> header_buffer_;
     std::vector<uint8_t> body_buffer_;
+    std::deque<std::vector<uint8_t>> write_buffer_;
 };
 
 } // namespace qqchat

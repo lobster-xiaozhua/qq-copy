@@ -1,0 +1,7 @@
+/workspace/server/build/CMakeFiles/qqchat_server.dir
+/workspace/server/build/CMakeFiles/edit_cache.dir
+/workspace/server/build/CMakeFiles/rebuild_cache.dir
+/workspace/server/build/CMakeFiles/list_install_components.dir
+/workspace/server/build/CMakeFiles/install.dir
+/workspace/server/build/CMakeFiles/install/local.dir
+/workspace/server/build/CMakeFiles/install/strip.dir

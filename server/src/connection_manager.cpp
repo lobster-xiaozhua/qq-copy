@@ -1,6 +1,7 @@
 #include "qqchat/connection_manager.hpp"
 #include "qqchat/chat_server.hpp"
 #include "qqchat/protocol_codec.hpp"
+#include <cstdint>
 #include <random>
 #include <sstream>
 
@@ -83,7 +84,7 @@ Connection::Connection(tcp::socket socket, ConnectionManager& manager, ChatServe
     : socket_(std::move(socket)), manager_(manager), server_(server), user_id_(0) {
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, 0xFFFFFFFFFFFFFFFF);
+    std::uniform_int_distribution<uint64_t> dis(0, UINT64_MAX);
     std::stringstream ss;
     ss << std::hex << dis(gen);
     conn_id_ = ss.str();
@@ -146,7 +147,7 @@ void Connection::do_read_header() {
         });
 }
 
-void Connection::do_read_body(size_t length) {
+void Connection::do_read_body(size_t /*length*/) {
     auto self(shared_from_this());
     boost::asio::async_read(socket_, boost::asio::buffer(body_buffer_),
         [this, self](boost::system::error_code ec, std::size_t /*length*/) {

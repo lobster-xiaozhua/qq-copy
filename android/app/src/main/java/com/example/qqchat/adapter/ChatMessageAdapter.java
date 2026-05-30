@@ -22,7 +22,6 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
     private static final int VIEW_TYPE_OTHER = 2;
 
     private List<Message> messages;
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
     public ChatMessageAdapter(List<Message> messages) {
         this.messages = messages;

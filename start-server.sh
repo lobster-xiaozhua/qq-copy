@@ -264,7 +264,7 @@ build_server() {
     mkdir -p build
     cd build
     
-    cmake "$SERVER_DIR" -DCMAKE_BUILD_TYPE=Release
+    cmake .. -DCMAKE_BUILD_TYPE=Release
     make -j$(nproc)
     
     if [ -f "qqchat_server" ]; then
