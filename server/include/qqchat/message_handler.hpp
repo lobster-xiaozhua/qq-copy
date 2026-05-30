@@ -24,6 +24,7 @@ public:
     void handle_register(std::shared_ptr<Connection> conn, const RegisterRequest& req);
     void handle_security_question(std::shared_ptr<Connection> conn, const SecurityQuestionRequest& req);
     void handle_reset_password(std::shared_ptr<Connection> conn, const ResetPasswordRequest& req);
+    void handle_version_check(std::shared_ptr<Connection> conn, const VersionCheckRequest& req);
     
 private:
     void send_response(std::shared_ptr<Connection> conn, CommandCode command, 
