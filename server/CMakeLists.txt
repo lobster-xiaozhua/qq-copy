@@ -3,15 +3,14 @@ project(qqchat_server VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Boost
+add_compile_options(-Wall -Wextra -Wpedantic)
+
 find_package(Boost REQUIRED COMPONENTS system thread)
 
-# MySQL (使用 pkg-config)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(MYSQL REQUIRED mysqlclient)
-
-# hiredis
 pkg_check_modules(HIREDIS REQUIRED hiredis)
 
 include_directories(

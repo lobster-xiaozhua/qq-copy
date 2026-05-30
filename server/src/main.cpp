@@ -2,14 +2,28 @@
 #include <iostream>
 #include <string>
 #include <fstream>
-#include <signal.h>
+#include <csignal>
+#include <chrono>
+#include <ctime>
+#include <sstream>
+
+static std::string now_str() {
+    auto now = std::chrono::system_clock::now();
+    auto t = std::chrono::system_clock::to_time_t(now);
+    char buf[32];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&t));
+    return buf;
+}
+
+#define LOG(msg) do { std::ostringstream _os; _os << "[" << now_str() << "] " << msg; std::cout << _os.str() << std::endl; } while(0)
+#define LOG_ERR(msg) do { std::ostringstream _os; _os << "[" << now_str() << "] " << msg; std::cerr << _os.str() << std::endl; } while(0)
 
 std::shared_ptr<qqchat::ChatServer> g_server;
 
 void signal_handler(int signal) {
+    LOG("Signal " << signal << " received, stopping server...");
     if (g_server) {
         g_server->stop();
-        std::cout << "Server stopped." << std::endl;
     }
     exit(0);
 }
@@ -21,10 +35,22 @@ std::string trim(const std::string& str) {
     return str.substr(first, last - first + 1);
 }
 
+static int safe_stoi(const std::string& str, int default_val) {
+    if (str.empty()) return default_val;
+    try {
+        size_t pos = 0;
+        int val = std::stoi(str, &pos);
+        if (pos != str.length()) return default_val;
+        return val;
+    } catch (...) {
+        return default_val;
+    }
+}
+
 std::string get_config_value(const std::string& config_file, const std::string& section, const std::string& key) {
     std::ifstream file(config_file);
     if (!file.is_open()) {
-        std::cerr << "Cannot open config file: " << config_file << std::endl;
+        LOG_ERR("Cannot open config file: " << config_file);
         return "";
     }
     
@@ -62,25 +88,25 @@ int main(int argc, char* argv[]) {
     
     std::string host = get_config_value(config_file, "server", "host");
     std::string port_str = get_config_value(config_file, "server", "port");
-    short port = port_str.empty() ? 8888 : std::stoi(port_str);
+    short port = static_cast<short>(safe_stoi(port_str, 8888));
     
     std::string mysql_host = get_config_value(config_file, "mysql", "host");
     std::string mysql_port_str = get_config_value(config_file, "mysql", "port");
-    int mysql_port = mysql_port_str.empty() ? 3306 : std::stoi(mysql_port_str);
+    int mysql_port = safe_stoi(mysql_port_str, 3306);
     std::string mysql_db = get_config_value(config_file, "mysql", "database");
     std::string mysql_user = get_config_value(config_file, "mysql", "username");
     std::string mysql_pass = get_config_value(config_file, "mysql", "password");
     
     std::string redis_host = get_config_value(config_file, "redis", "host");
     std::string redis_port_str = get_config_value(config_file, "redis", "port");
-    int redis_port = redis_port_str.empty() ? 6379 : std::stoi(redis_port_str);
+    int redis_port = safe_stoi(redis_port_str, 6379);
     
-    std::cout << "========================================" << std::endl;
-    std::cout << "  QQChat Server Starting..." << std::endl;
-    std::cout << "  Port: " << port << std::endl;
-    std::cout << "  MySQL: " << mysql_host << ":" << mysql_port << "/" << mysql_db << std::endl;
-    std::cout << "  Redis: " << redis_host << ":" << redis_port << std::endl;
-    std::cout << "========================================" << std::endl;
+    LOG("=====================================");
+    LOG("  QQChat Server v1.0");
+    LOG("  Port: " << port);
+    LOG("  MySQL: " << mysql_host << ":" << mysql_port << "/" << mysql_db);
+    LOG("  Redis: " << redis_host << ":" << redis_port);
+    LOG("=====================================");
     
     try {
         auto db_pool = std::make_shared<qqchat::DatabasePool>(
@@ -88,17 +114,17 @@ int main(int argc, char* argv[]) {
         
         auto cache_manager = std::make_shared<qqchat::CacheManager>(redis_host, redis_port);
         
-        g_server = std::make_shared<qqchat::ChatServer>("0.0.0.0", port, db_pool, cache_manager);
+        g_server = std::make_shared<qqchat::ChatServer>(host.empty() ? "0.0.0.0" : host, port, db_pool, cache_manager);
         
         signal(SIGINT, signal_handler);
         signal(SIGTERM, signal_handler);
         
-        std::cout << "Server started successfully!" << std::endl;
-        std::cout << "Press Ctrl+C to stop." << std::endl;
+        LOG("Server started successfully, listening on " << (host.empty() ? "0.0.0.0" : host) << ":" << port);
+        LOG("Press Ctrl+C to stop.");
         
         g_server->run();
     } catch (const std::exception& e) {
-        std::cerr << "Server error: " << e.what() << std::endl;
+        LOG_ERR("Server fatal error: " << e.what());
         return 1;
     }
     

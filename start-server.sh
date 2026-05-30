@@ -1,25 +1,19 @@
 #!/bin/bash
 
-# QQ-Copy 一键启动脚本
-# 服务器端 - 包含依赖安装、数据库初始化、编译启动
-
 set -e
 
-# 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}   QQ-Copy 服务器端一键启动${NC}"
 echo -e "${BLUE}========================================${NC}"
 
-# 获取脚本所在目录的绝对路径
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# 1. 检查是否以 root 权限运行
 check_root() {
     if [[ $EUID -ne 0 ]]; then
         echo -e "${YELLOW}提示: 建议使用 sudo 运行此脚本以安装依赖${NC}"
@@ -31,7 +25,6 @@ check_root() {
     fi
 }
 
-# 2. 配置阿里镜像源
 setup_mirrors() {
     echo -e "${GREEN}[1/8] 配置阿里镜像源...${NC}"
     
@@ -56,7 +49,6 @@ setup_mirrors() {
     fi
 }
 
-# 3. 安装基础依赖
 install_dependencies() {
     echo -e "${GREEN}[2/8] 安装系统依赖...${NC}"
     
@@ -99,7 +91,6 @@ install_dependencies() {
     echo -e "${GREEN}基础依赖安装完成${NC}"
 }
 
-# 4. 配置数据库
 setup_database() {
     echo -e "${GREEN}[3/8] 配置 MySQL 数据库...${NC}"
     
@@ -107,15 +98,13 @@ setup_database() {
     DB_PASS="password"
     DB_NAME="qqchat"
     
-    # 尝试多种方式启动 MySQL
     echo -e "${GREEN}尝试启动 MySQL...${NC}"
     MYSQL_STARTED=0
     
-    # 方式1: mysqld 直接启动
     if command -v mysqld &> /dev/null && [ $MYSQL_STARTED -eq 0 ]; then
         echo -e "${YELLOW}尝试直接启动 mysqld...${NC}"
         mkdir -p /var/run/mysqld
-        chown mysql:mysql /var/run/mysqld
+        chown mysql:mysql /var/run/mysqld 2>/dev/null || true
         mysqld --user=mysql --daemonize 2>/dev/null || true
         sleep 3
         if mysql -e "SELECT 1;" &>/dev/null; then
@@ -124,7 +113,6 @@ setup_database() {
         fi
     fi
     
-    # 方式2: service mysql
     if [ $MYSQL_STARTED -eq 0 ]; then
         if command -v service &> /dev/null; then
             $CMD_PREFIX service mysql start 2>/dev/null || \
@@ -137,7 +125,6 @@ setup_database() {
         fi
     fi
     
-    # 方式3: systemctl
     if [ $MYSQL_STARTED -eq 0 ] && command -v systemctl &> /dev/null; then
         $CMD_PREFIX systemctl start mysql 2>/dev/null || \
         $CMD_PREFIX systemctl start mysqld 2>/dev/null || true
@@ -148,12 +135,10 @@ setup_database() {
         fi
     fi
     
-    # 检查 MySQL 是否可用
     if [ $MYSQL_STARTED -eq 0 ]; then
         if ! mysql -e "SELECT 1;" &>/dev/null; then
             echo -e "${RED}错误: MySQL 无法启动${NC}"
             echo -e "${YELLOW}请手动检查 MySQL 安装${NC}"
-            echo -e "${YELLOW}提示: 可以运行 'mysqld --user=mysql --daemonize' 启动${NC}"
             return 1
         else
             MYSQL_STARTED=1
@@ -161,7 +146,6 @@ setup_database() {
         fi
     fi
     
-    # 初始化数据库
     echo -e "${GREEN}正在初始化数据库...${NC}"
     
     SQL_FILE="$SCRIPT_DIR/sql/init.sql"
@@ -171,7 +155,6 @@ setup_database() {
         return 1
     fi
     
-    # 执行 SQL
     (
         echo "CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
         echo "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';"
@@ -181,7 +164,6 @@ setup_database() {
         cat "$SQL_FILE"
     ) | mysql 2>/dev/null || true
     
-    # 验证数据库
     if mysql -e "USE $DB_NAME; SELECT COUNT(*) FROM users;" &>/dev/null; then
         echo -e "${GREEN}数据库初始化成功${NC}"
     else
@@ -189,14 +171,11 @@ setup_database() {
     fi
 }
 
-# 5. 启动 Redis
 start_redis() {
     echo -e "${GREEN}[4/8] 启动 Redis...${NC}"
     
-    # 尝试多种方式启动 Redis
     REDIS_STARTED=0
     
-    # 方式1: redis-server 直接启动
     if command -v redis-server &> /dev/null && [ $REDIS_STARTED -eq 0 ]; then
         if ! redis-cli ping &>/dev/null; then
             redis-server --daemonize yes 2>/dev/null || true
@@ -208,7 +187,6 @@ start_redis() {
         fi
     fi
     
-    # 方式2: service
     if [ $REDIS_STARTED -eq 0 ]; then
         if command -v service &> /dev/null; then
             $CMD_PREFIX service redis-server start 2>/dev/null || \
@@ -221,7 +199,6 @@ start_redis() {
         fi
     fi
     
-    # 方式3: systemctl
     if [ $REDIS_STARTED -eq 0 ] && command -v systemctl &> /dev/null; then
         $CMD_PREFIX systemctl start redis-server 2>/dev/null || \
         $CMD_PREFIX systemctl start redis 2>/dev/null || true
@@ -239,7 +216,6 @@ start_redis() {
     fi
 }
 
-# 6. 编译服务器
 build_server() {
     echo -e "${GREEN}[5/8] 编译服务器...${NC}"
     
@@ -264,7 +240,7 @@ build_server() {
     mkdir -p build
     cd build
     
-    cmake "$SERVER_DIR" -DCMAKE_BUILD_TYPE=Release
+    cmake .. -DCMAKE_BUILD_TYPE=Release
     make -j$(nproc)
     
     if [ -f "qqchat_server" ]; then
@@ -277,7 +253,6 @@ build_server() {
     cd "$SCRIPT_DIR"
 }
 
-# 7. 配置服务器
 configure_server() {
     echo -e "${GREEN}[6/8] 配置服务器...${NC}"
     
@@ -314,7 +289,6 @@ EOF
     fi
 }
 
-# 8. 启动服务器
 start_server() {
     echo -e "${GREEN}[7/8] 启动服务器...${NC}"
     
@@ -338,7 +312,6 @@ start_server() {
     fi
 }
 
-# 显示帮助
 show_help() {
     echo "QQ-Copy 服务器端一键启动脚本"
     echo ""
@@ -356,11 +329,9 @@ show_help() {
     echo ""
 }
 
-# 主函数
 main() {
     check_root
     
-    # 解析命令行参数
     if [ "$1" == "--help" ]; then
         show_help
         exit 0
@@ -383,7 +354,6 @@ main() {
         exit 0
     fi
     
-    # 默认完整流程
     setup_mirrors
     install_dependencies
     setup_database || true
