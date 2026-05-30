@@ -19,6 +19,8 @@ struct User {
     std::string username;
     std::string password_hash;
     std::string avatar_url;
+    std::string security_question;
+    std::string security_answer;
 };
 
 struct Friend {
@@ -47,6 +49,13 @@ public:
     bool verify_user(const std::string& username, const std::string& password, User& user);
     bool get_user_by_id(int user_id, User& user);
     bool get_user_by_name(const std::string& username, User& user);
+    bool register_user(const std::string& username, const std::string& password,
+                      const std::string& security_question, const std::string& security_answer);
+    bool username_exists(const std::string& username);
+    bool get_security_question(const std::string& username, std::string& question, std::string& answer);
+    bool reset_password(const std::string& username, const std::string& new_password);
+    bool update_password(int user_id, const std::string& new_password);
+    
     bool add_user(const std::string& username, const std::string& password_hash);
     bool add_friend(int user_id, int friend_id);
     bool delete_friend(int user_id, int friend_id);
