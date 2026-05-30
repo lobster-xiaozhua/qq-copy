@@ -26,6 +26,7 @@ public class ChatService extends Service {
         void onRegisterResult(int errorCode, int userId);
         void onSecurityQuestionResult(int errorCode, String question);
         void onResetPasswordResult(int errorCode);
+        void onVersionCheckResult(int errorCode, int serverVersion, String updateUrl, String updateDesc);
     }
 
     public class LocalBinder extends Binder {
@@ -95,6 +96,10 @@ public class ChatService extends Service {
         nativeResetPassword(username, newPassword, securityAnswer);
     }
 
+    public void checkVersion(int clientVersion) {
+        nativeCheckVersion(clientVersion);
+    }
+
     public int getCurrentUserId() {
         return currentUserId;
     }
@@ -162,6 +167,13 @@ public class ChatService extends Service {
         }
     }
 
+    private void onVersionCheckResult(int errorCode, int serverVersion, String updateUrl, String updateDesc) {
+        Log.d(TAG, "Version check result: errorCode=" + errorCode + ", serverVersion=" + serverVersion);
+        if (listener != null) {
+            listener.onVersionCheckResult(errorCode, serverVersion, updateUrl, updateDesc);
+        }
+    }
+
     static {
         System.loadLibrary("qqchat_core");
     }
@@ -177,5 +189,6 @@ public class ChatService extends Service {
     private native void nativeRegister(String username, String password, String securityQuestion, String securityAnswer);
     private native void nativeGetSecurityQuestion(String username);
     private native void nativeResetPassword(String username, String newPassword, String securityAnswer);
+    private native void nativeCheckVersion(int clientVersion);
     private native void nativeDestroy();
 }

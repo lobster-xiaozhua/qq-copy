@@ -24,6 +24,7 @@ static jmethodID g_on_friend_list_received = nullptr;
 static jmethodID g_on_register_result = nullptr;
 static jmethodID g_on_security_question_result = nullptr;
 static jmethodID g_on_reset_password_result = nullptr;
+static jmethodID g_on_version_check_result = nullptr;
 
 static void attach_callbacks(JNIEnv* env, jobject service) {
     std::lock_guard<std::mutex> lock(g_mutex);
@@ -37,6 +38,7 @@ static void attach_callbacks(JNIEnv* env, jobject service) {
     g_on_register_result = env->GetMethodID(g_service_class, "onRegisterResult", "(II)V");
     g_on_security_question_result = env->GetMethodID(g_service_class, "onSecurityQuestionResult", "(ILjava/lang/String;)V");
     g_on_reset_password_result = env->GetMethodID(g_service_class, "onResetPasswordResult", "(I)V");
+    g_on_version_check_result = env->GetMethodID(g_service_class, "onVersionCheckResult", "(IILjava/lang/String;Ljava/lang/String;)V");
 }
 
 static void detach_callbacks(JNIEnv* env) {
@@ -179,6 +181,26 @@ static void notify_reset_password(int error_code) {
     if (!env) return;
 
     env->CallVoidMethod(g_service_obj, g_on_reset_password_result, error_code);
+    if (attached) g_jvm->DetachCurrentThread();
+}
+
+static void notify_version_check(int error_code, int server_version, const std::string& update_url, const std::string& update_desc) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_jvm || !g_service_obj) return;
+
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    if (g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    }
+    if (!env) return;
+
+    jstring j_url = env->NewStringUTF(update_url.c_str());
+    jstring j_desc = env->NewStringUTF(update_desc.c_str());
+    env->CallVoidMethod(g_service_obj, g_on_version_check_result, error_code, server_version, j_url, j_desc);
+    env->DeleteLocalRef(j_url);
+    env->DeleteLocalRef(j_desc);
     if (attached) g_jvm->DetachCurrentThread();
 }
 
@@ -332,6 +354,17 @@ Java_com_example_qqchat_ChatService_nativeResetPassword(JNIEnv* env, jobject, js
     env->ReleaseStringUTFChars(username, user);
     env->ReleaseStringUTFChars(new_password, new_pass);
     env->ReleaseStringUTFChars(security_answer, answer);
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_qqchat_ChatService_nativeCheckVersion(JNIEnv* env, jobject, jint client_version) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_client) return;
+
+    LOGI("Checking version: %d", client_version);
+    g_client->check_version(client_version, [](int error_code, int server_version, const std::string& update_url, const std::string& update_desc) {
+        notify_version_check(error_code, server_version, update_url, update_desc);
+    });
 }
 
 JNIEXPORT void JNICALL
