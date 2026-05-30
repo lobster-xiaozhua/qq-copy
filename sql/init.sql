@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS users;
 CREATE TABLE users (
     user_id INT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(64) UNIQUE NOT NULL,
-    password_hash VARCHAR(256) NOT NULL,
+    password_hash VARCHAR(64) NOT NULL,
     avatar_url VARCHAR(256),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -39,12 +39,17 @@ CREATE TABLE messages (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO users (username, password_hash) VALUES 
-('admin', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
-('user1', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
-('user2', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+('admin',    'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f'),
+('user1',   'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f'),
+('user2',   'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f'),
+('test',    'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f');
 
 INSERT INTO friends (user_id, friend_id) VALUES 
 (1, 2),
 (1, 3),
+(1, 4),
 (2, 1),
-(3, 1);
+(2, 3),
+(3, 1),
+(3, 2),
+(4, 1);

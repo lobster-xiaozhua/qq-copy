@@ -10,6 +10,7 @@
 #include <memory>
 #include <functional>
 #include <stdexcept>
+#include <iomanip>
 
 namespace qqchat {
 

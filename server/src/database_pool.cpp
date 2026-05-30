@@ -7,6 +7,16 @@
 
 namespace qqchat {
 
+static std::string sha256(const std::string& input) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256((const unsigned char*)input.c_str(), input.length(), hash);
+    std::ostringstream oss;
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+        oss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
+    }
+    return oss.str();
+}
+
 DatabasePool::DatabasePool(const std::string& host, int port, const std::string& db, 
                            const std::string& user, const std::string& pass, int pool_size)
     : host_(host), port_(port), db_name_(db), user_(user), password_(pass), pool_size_(pool_size) {
@@ -101,9 +111,9 @@ bool DatabasePool::verify_user(const std::string& username, const std::string& p
     MYSQL_BIND result_params[3];
     memset(result_params, 0, sizeof(result_params));
     
-    int user_id;
-    char username_buf[65];
-    char password_hash_buf[257];
+    int user_id = 0;
+    char username_buf[65] = {0};
+    char password_hash_buf[65] = {0};
     
     result_params[0].buffer_type = MYSQL_TYPE_LONG;
     result_params[0].buffer = &user_id;
@@ -114,7 +124,7 @@ bool DatabasePool::verify_user(const std::string& username, const std::string& p
     
     result_params[2].buffer_type = MYSQL_TYPE_STRING;
     result_params[2].buffer = password_hash_buf;
-    result_params[2].buffer_length = 256;
+    result_params[2].buffer_length = 64;
     
     mysql_stmt_bind_result(stmt, result_params);
     int fetch_ret = mysql_stmt_fetch(stmt);
@@ -122,7 +132,7 @@ bool DatabasePool::verify_user(const std::string& username, const std::string& p
     bool match = false;
     if (fetch_ret == 0) {
         std::string stored_hash(password_hash_buf);
-        std::string input_hash = password;
+        std::string input_hash = sha256(password);
         match = (stored_hash == input_hash);
         
         if (match) {
@@ -175,8 +185,8 @@ bool DatabasePool::get_user_by_id(int user_id, User& user) {
     MYSQL_BIND result_params[3];
     memset(result_params, 0, sizeof(result_params));
     
-    char username_buf[65];
-    char avatar_url_buf[257];
+    char username_buf[65] = {0};
+    char avatar_url_buf[257] = {0};
     
     result_params[0].buffer_type = MYSQL_TYPE_LONG;
     result_params[0].buffer = &user.user_id;
@@ -241,8 +251,8 @@ bool DatabasePool::get_user_by_name(const std::string& username, User& user) {
     MYSQL_BIND result_params[3];
     memset(result_params, 0, sizeof(result_params));
     
-    char username_buf[65];
-    char avatar_url_buf[257];
+    char username_buf[65] = {0};
+    char avatar_url_buf[257] = {0};
     
     result_params[0].buffer_type = MYSQL_TYPE_LONG;
     result_params[0].buffer = &user.user_id;
@@ -309,9 +319,9 @@ bool DatabasePool::get_friends(int user_id, std::vector<Friend>& friends) {
     MYSQL_BIND result_params[3];
     memset(result_params, 0, sizeof(result_params));
     
-    int friend_id;
-    char username_buf[65];
-    char avatar_url_buf[257];
+    int friend_id = 0;
+    char username_buf[65] = {0};
+    char avatar_url_buf[257] = {0};
     
     result_params[0].buffer_type = MYSQL_TYPE_LONG;
     result_params[0].buffer = &friend_id;
@@ -435,9 +445,9 @@ bool DatabasePool::get_messages(int user_id, int friend_id, std::vector<Message>
     MYSQL_BIND result_params[5];
     memset(result_params, 0, sizeof(result_params));
     
-    int msg_id, from_id, to_id;
-    char content_buf[4096];
-    char timestamp_buf[20];
+    int msg_id = 0, from_id = 0, to_id = 0;
+    char content_buf[4096] = {0};
+    char timestamp_buf[20] = {0};
     
     result_params[0].buffer_type = MYSQL_TYPE_LONG;
     result_params[0].buffer = &msg_id;
