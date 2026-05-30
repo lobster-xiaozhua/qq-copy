@@ -17,7 +17,13 @@ enum class CommandCode : uint16_t {
     FRIEND_LIST_REQ = 0x0006,
     FRIEND_LIST_RESP = 0x0007,
     ADD_FRIEND_REQ = 0x0008,
-    ADD_FRIEND_RESP = 0x0009
+    ADD_FRIEND_RESP = 0x0009,
+    REGISTER_REQ = 0x000A,
+    REGISTER_RESP = 0x000B,
+    SECURITY_QUESTION_REQ = 0x000C,
+    SECURITY_QUESTION_RESP = 0x000D,
+    RESET_PASSWORD_REQ = 0x000E,
+    RESET_PASSWORD_RESP = 0x000F
 };
 
 enum class ErrorCode : uint16_t {
@@ -29,7 +35,11 @@ enum class ErrorCode : uint16_t {
     PROTOCOL_ERROR = 0x0005,
     DATABASE_ERROR = 0x0006,
     FRIEND_REQUEST_EXISTS = 0x0007,
-    CANNOT_ADD_SELF = 0x0008
+    CANNOT_ADD_SELF = 0x0008,
+    USERNAME_EXISTS = 0x0009,
+    INVALID_ANSWER = 0x000A,
+    SECURITY_QUESTION_NOT_SET = 0x000B,
+    INVALID_REQUEST = 0x000C
 };
 
 struct LoginRequest {
@@ -77,6 +87,37 @@ struct AddFriendResponse {
     ErrorCode error_code;
 };
 
+struct RegisterRequest {
+    std::string username;
+    std::string password;
+    std::string security_question;
+    std::string security_answer;
+};
+
+struct RegisterResponse {
+    ErrorCode error_code;
+    int user_id;
+};
+
+struct SecurityQuestionRequest {
+    std::string username;
+};
+
+struct SecurityQuestionResponse {
+    ErrorCode error_code;
+    std::string question;
+};
+
+struct ResetPasswordRequest {
+    std::string username;
+    std::string new_password;
+    std::string security_answer;
+};
+
+struct ResetPasswordResponse {
+    ErrorCode error_code;
+};
+
 struct Packet {
     uint8_t version;
     CommandCode command;
@@ -102,6 +143,15 @@ public:
     
     static std::vector<uint8_t> encode_friend_list_response(const FriendListResponse& resp);
     static std::vector<uint8_t> encode_add_friend_response(const AddFriendResponse& resp);
+    
+    static bool decode_register_request(const std::vector<uint8_t>& data, RegisterRequest& req);
+    static std::vector<uint8_t> encode_register_response(const RegisterResponse& resp);
+    
+    static bool decode_security_question_request(const std::vector<uint8_t>& data, SecurityQuestionRequest& req);
+    static std::vector<uint8_t> encode_security_question_response(const SecurityQuestionResponse& resp);
+    
+    static bool decode_reset_password_request(const std::vector<uint8_t>& data, ResetPasswordRequest& req);
+    static std::vector<uint8_t> encode_reset_password_response(const ResetPasswordResponse& resp);
     
     static void write_uint16(std::vector<uint8_t>& buffer, uint16_t value);
     static void write_uint32(std::vector<uint8_t>& buffer, uint32_t value);

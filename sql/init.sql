@@ -8,6 +8,8 @@ CREATE TABLE users (
     username VARCHAR(64) UNIQUE NOT NULL,
     password_hash VARCHAR(256) NOT NULL,
     avatar_url VARCHAR(256),
+    security_question VARCHAR(256) NOT NULL,
+    security_answer VARCHAR(256) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_username (username)
@@ -38,10 +40,10 @@ CREATE TABLE messages (
     FOREIGN KEY (to_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO users (username, password_hash) VALUES 
-('admin', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
-('user1', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
-('user2', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+INSERT INTO users (username, password_hash, security_question, security_answer) VALUES 
+('admin', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f', 'Your favorite pet name?', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f'),
+('user1', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f', 'Your first school name?', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f'),
+('user2', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f', 'Your birthday month?', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f');
 
 INSERT INTO friends (user_id, friend_id) VALUES 
 (1, 2),

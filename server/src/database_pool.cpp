@@ -577,4 +577,240 @@ bool DatabasePool::delete_friend(int user_id, int friend_id) {
     return success;
 }
 
+static std::string sha256(const std::string& str) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256((unsigned char*)str.c_str(), str.length(), hash);
+    std::string result;
+    result.reserve(SHA256_DIGEST_LENGTH * 2);
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+        char buf[3];
+        snprintf(buf, sizeof(buf), "%02x", hash[i]);
+        result += buf;
+    }
+    return result;
+}
+
+bool DatabasePool::register_user(const std::string& username, const std::string& password_hash,
+                                  const std::string& security_question, const std::string& security_answer_hash,
+                                  int& out_user_id) {
+    auto conn = get_connection();
+    if (!conn) return false;
+    
+    std::string query = "INSERT INTO users (username, password_hash, security_question, security_answer) VALUES (?, ?, ?, ?)";
+    MYSQL_STMT* stmt = mysql_stmt_init(conn.get());
+    if (!stmt) return false;
+    
+    if (mysql_stmt_prepare(stmt, query.c_str(), query.length()) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    MYSQL_BIND params[4];
+    memset(params, 0, sizeof(params));
+    
+    params[0].buffer_type = MYSQL_TYPE_STRING;
+    params[0].buffer = (char*)username.c_str();
+    params[0].buffer_length = username.length();
+    
+    params[1].buffer_type = MYSQL_TYPE_STRING;
+    params[1].buffer = (char*)password_hash.c_str();
+    params[1].buffer_length = password_hash.length();
+    
+    params[2].buffer_type = MYSQL_TYPE_STRING;
+    params[2].buffer = (char*)security_question.c_str();
+    params[2].buffer_length = security_question.length();
+    
+    params[3].buffer_type = MYSQL_TYPE_STRING;
+    params[3].buffer = (char*)security_answer_hash.c_str();
+    params[3].buffer_length = security_answer_hash.length();
+    
+    if (mysql_stmt_bind_param(stmt, params) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    bool success = (mysql_stmt_execute(stmt) == 0);
+    if (success) {
+        out_user_id = static_cast<int>(mysql_stmt_insert_id(stmt));
+    }
+    mysql_stmt_close(stmt);
+    
+    return success;
+}
+
+bool DatabasePool::username_exists(const std::string& username) {
+    auto conn = get_connection();
+    if (!conn) return false;
+    
+    std::string query = "SELECT COUNT(*) FROM users WHERE username = ?";
+    MYSQL_STMT* stmt = mysql_stmt_init(conn.get());
+    if (!stmt) return false;
+    
+    if (mysql_stmt_prepare(stmt, query.c_str(), query.length()) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    MYSQL_BIND params[1];
+    memset(params, 0, sizeof(params));
+    params[0].buffer_type = MYSQL_TYPE_STRING;
+    params[0].buffer = (char*)username.c_str();
+    params[0].buffer_length = username.length();
+    
+    if (mysql_stmt_bind_param(stmt, params) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    if (mysql_stmt_execute(stmt) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    MYSQL_BIND result_params[1];
+    memset(result_params, 0, sizeof(result_params));
+    int count = 0;
+    result_params[0].buffer_type = MYSQL_TYPE_LONG;
+    result_params[0].buffer = &count;
+    
+    mysql_stmt_bind_result(stmt, result_params);
+    mysql_stmt_fetch(stmt);
+    
+    mysql_stmt_close(stmt);
+    return count > 0;
+}
+
+bool DatabasePool::get_security_question(const std::string& username, std::string& question, std::string& answer_hash) {
+    auto conn = get_connection();
+    if (!conn) return false;
+    
+    std::string query = "SELECT security_question, security_answer FROM users WHERE username = ?";
+    MYSQL_STMT* stmt = mysql_stmt_init(conn.get());
+    if (!stmt) return false;
+    
+    if (mysql_stmt_prepare(stmt, query.c_str(), query.length()) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    MYSQL_BIND params[1];
+    memset(params, 0, sizeof(params));
+    params[0].buffer_type = MYSQL_TYPE_STRING;
+    params[0].buffer = (char*)username.c_str();
+    params[0].buffer_length = username.length();
+    
+    if (mysql_stmt_bind_param(stmt, params) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    if (mysql_stmt_execute(stmt) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    MYSQL_RES* result = mysql_stmt_result_metadata(stmt);
+    if (!result) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    MYSQL_BIND result_params[2];
+    memset(result_params, 0, sizeof(result_params));
+    
+    char question_buf[257];
+    char answer_buf[257];
+    
+    result_params[0].buffer_type = MYSQL_TYPE_STRING;
+    result_params[0].buffer = question_buf;
+    result_params[0].buffer_length = 256;
+    
+    result_params[1].buffer_type = MYSQL_TYPE_STRING;
+    result_params[1].buffer = answer_buf;
+    result_params[1].buffer_length = 256;
+    
+    mysql_stmt_bind_result(stmt, result_params);
+    
+    bool found = false;
+    if (mysql_stmt_fetch(stmt) == 0) {
+        question = question_buf;
+        answer_hash = answer_buf;
+        found = true;
+    }
+    
+    mysql_free_result(result);
+    mysql_stmt_close(stmt);
+    
+    return found;
+}
+
+bool DatabasePool::reset_password(const std::string& username, const std::string& new_password_hash) {
+    auto conn = get_connection();
+    if (!conn) return false;
+    
+    std::string query = "UPDATE users SET password_hash = ? WHERE username = ?";
+    MYSQL_STMT* stmt = mysql_stmt_init(conn.get());
+    if (!stmt) return false;
+    
+    if (mysql_stmt_prepare(stmt, query.c_str(), query.length()) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    MYSQL_BIND params[2];
+    memset(params, 0, sizeof(params));
+    
+    params[0].buffer_type = MYSQL_TYPE_STRING;
+    params[0].buffer = (char*)new_password_hash.c_str();
+    params[0].buffer_length = new_password_hash.length();
+    
+    params[1].buffer_type = MYSQL_TYPE_STRING;
+    params[1].buffer = (char*)username.c_str();
+    params[1].buffer_length = username.length();
+    
+    if (mysql_stmt_bind_param(stmt, params) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    bool success = (mysql_stmt_execute(stmt) == 0);
+    mysql_stmt_close(stmt);
+    
+    return success;
+}
+
+bool DatabasePool::update_password(int user_id, const std::string& new_password_hash) {
+    auto conn = get_connection();
+    if (!conn) return false;
+    
+    std::string query = "UPDATE users SET password_hash = ? WHERE user_id = ?";
+    MYSQL_STMT* stmt = mysql_stmt_init(conn.get());
+    if (!stmt) return false;
+    
+    if (mysql_stmt_prepare(stmt, query.c_str(), query.length()) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    MYSQL_BIND params[2];
+    memset(params, 0, sizeof(params));
+    
+    params[0].buffer_type = MYSQL_TYPE_STRING;
+    params[0].buffer = (char*)new_password_hash.c_str();
+    params[0].buffer_length = new_password_hash.length();
+    
+    params[1].buffer_type = MYSQL_TYPE_LONG;
+    params[1].buffer = &user_id;
+    
+    if (mysql_stmt_bind_param(stmt, params) != 0) {
+        mysql_stmt_close(stmt);
+        return false;
+    }
+    
+    bool success = (mysql_stmt_execute(stmt) == 0);
+    mysql_stmt_close(stmt);
+    
+    return success;
+}
+
 } // namespace qqchat

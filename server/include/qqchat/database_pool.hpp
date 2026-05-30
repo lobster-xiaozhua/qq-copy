@@ -18,6 +18,8 @@ struct User {
     std::string username;
     std::string password_hash;
     std::string avatar_url;
+    std::string security_question;
+    std::string security_answer;
 };
 
 struct Friend {
@@ -52,6 +54,13 @@ public:
     bool get_friends(int user_id, std::vector<Friend>& friends);
     bool send_message(int from_id, int to_id, const std::string& content, int& out_msg_id);
     bool get_messages(int user_id, int friend_id, std::vector<Message>& messages, int limit = 50);
+    bool register_user(const std::string& username, const std::string& password_hash,
+                      const std::string& security_question, const std::string& security_answer_hash,
+                      int& out_user_id);
+    bool username_exists(const std::string& username);
+    bool get_security_question(const std::string& username, std::string& question, std::string& answer_hash);
+    bool reset_password(const std::string& username, const std::string& new_password_hash);
+    bool update_password(int user_id, const std::string& new_password_hash);
 
 private:
     std::string host_;

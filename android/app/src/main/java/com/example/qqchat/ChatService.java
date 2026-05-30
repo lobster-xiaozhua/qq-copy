@@ -23,6 +23,9 @@ public class ChatService extends Service {
         void onLoginResult(int errorCode, int userId, String username);
         void onMessageReceived(int fromId, String content, long timestamp);
         void onFriendListReceived(int errorCode, List<Integer> friendIds, List<String> friendNames);
+        void onRegisterResult(int errorCode, int userId);
+        void onSecurityQuestionResult(int errorCode, String question);
+        void onResetPasswordResult(int errorCode);
     }
 
     public class LocalBinder extends Binder {
@@ -80,6 +83,18 @@ public class ChatService extends Service {
         nativeAddFriend(friendId);
     }
 
+    public void register(String username, String password, String securityQuestion, String securityAnswer) {
+        nativeRegister(username, password, securityQuestion, securityAnswer);
+    }
+
+    public void getSecurityQuestion(String username) {
+        nativeGetSecurityQuestion(username);
+    }
+
+    public void resetPassword(String username, String newPassword, String securityAnswer) {
+        nativeResetPassword(username, newPassword, securityAnswer);
+    }
+
     public int getCurrentUserId() {
         return currentUserId;
     }
@@ -126,6 +141,27 @@ public class ChatService extends Service {
         }
     }
 
+    private void onRegisterResult(int errorCode, int userId) {
+        Log.d(TAG, "Register result: errorCode=" + errorCode + ", userId=" + userId);
+        if (listener != null) {
+            listener.onRegisterResult(errorCode, userId);
+        }
+    }
+
+    private void onSecurityQuestionResult(int errorCode, String question) {
+        Log.d(TAG, "Security question result: errorCode=" + errorCode);
+        if (listener != null) {
+            listener.onSecurityQuestionResult(errorCode, question);
+        }
+    }
+
+    private void onResetPasswordResult(int errorCode) {
+        Log.d(TAG, "Reset password result: errorCode=" + errorCode);
+        if (listener != null) {
+            listener.onResetPasswordResult(errorCode);
+        }
+    }
+
     static {
         System.loadLibrary("qqchat_core");
     }
@@ -138,5 +174,8 @@ public class ChatService extends Service {
     private native void nativeSendMessage(int toId, String content);
     private native void nativeGetFriendList();
     private native void nativeAddFriend(int friendId);
+    private native void nativeRegister(String username, String password, String securityQuestion, String securityAnswer);
+    private native void nativeGetSecurityQuestion(String username);
+    private native void nativeResetPassword(String username, String newPassword, String securityAnswer);
     private native void nativeDestroy();
 }

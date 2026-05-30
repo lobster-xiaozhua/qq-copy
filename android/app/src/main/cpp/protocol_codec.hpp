@@ -16,7 +16,13 @@ enum class CommandCode : uint16_t {
     FRIEND_LIST_REQ = 0x0006,
     FRIEND_LIST_RESP = 0x0007,
     ADD_FRIEND_REQ = 0x0008,
-    ADD_FRIEND_RESP = 0x0009
+    ADD_FRIEND_RESP = 0x0009,
+    REGISTER_REQ = 0x000A,
+    REGISTER_RESP = 0x000B,
+    SECURITY_QUESTION_REQ = 0x000C,
+    SECURITY_QUESTION_RESP = 0x000D,
+    RESET_PASSWORD_REQ = 0x000E,
+    RESET_PASSWORD_RESP = 0x000F
 };
 
 enum class ErrorCode : uint16_t {
@@ -28,7 +34,10 @@ enum class ErrorCode : uint16_t {
     PROTOCOL_ERROR = 0x0005,
     DATABASE_ERROR = 0x0006,
     FRIEND_REQUEST_EXISTS = 0x0007,
-    CANNOT_ADD_SELF = 0x0008
+    CANNOT_ADD_SELF = 0x0008,
+    USERNAME_EXISTS = 0x0009,
+    INVALID_ANSWER = 0x000A,
+    SECURITY_QUESTION_NOT_SET = 0x000B
 };
 
 struct LoginResponse {
@@ -46,6 +55,20 @@ struct MessageNotify {
 struct FriendInfo {
     int friend_id;
     std::string friend_name;
+};
+
+struct RegisterResponse {
+    ErrorCode error_code;
+    int user_id;
+};
+
+struct SecurityQuestionResponse {
+    ErrorCode error_code;
+    std::string question;
+};
+
+struct ResetPasswordResponse {
+    ErrorCode error_code;
 };
 
 class ProtocolCodec {
@@ -66,6 +89,17 @@ public:
     static bool decode_friend_list_response(const std::vector<uint8_t>& data, std::vector<FriendInfo>& friends);
     
     static std::vector<uint8_t> encode_add_friend_request(int friend_id);
+    
+    static std::vector<uint8_t> encode_register_request(const std::string& username, const std::string& password,
+                                                       const std::string& security_question, const std::string& security_answer);
+    static bool decode_register_response(const std::vector<uint8_t>& data, RegisterResponse& resp);
+    
+    static std::vector<uint8_t> encode_security_question_request(const std::string& username);
+    static bool decode_security_question_response(const std::vector<uint8_t>& data, SecurityQuestionResponse& resp);
+    
+    static std::vector<uint8_t> encode_reset_password_request(const std::string& username, const std::string& new_password,
+                                                            const std::string& security_answer);
+    static bool decode_reset_password_response(const std::vector<uint8_t>& data, ResetPasswordResponse& resp);
     
 private:
     static void write_uint16(std::vector<uint8_t>& buffer, uint16_t value);

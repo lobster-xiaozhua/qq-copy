@@ -1,6 +1,7 @@
 #include "qqchat/message_handler.hpp"
 #include "qqchat/chat_server.hpp"
 #include "qqchat/protocol_codec.hpp"
+#include <openssl/sha.h>
 #include <iostream>
 #include <sstream>
 #include <chrono>
@@ -51,6 +52,27 @@ void MessageHandler::handle_message(std::shared_ptr<Connection> conn, const Pack
             if (packet.data.size() >= 4) {
                 req.friend_id = ProtocolCodec::read_int32(packet.data.data());
                 handle_add_friend(conn, req);
+            }
+            break;
+        }
+        case CommandCode::REGISTER_REQ: {
+            RegisterRequest req;
+            if (ProtocolCodec::decode_register_request(packet.data, req)) {
+                handle_register(conn, req);
+            }
+            break;
+        }
+        case CommandCode::SECURITY_QUESTION_REQ: {
+            SecurityQuestionRequest req;
+            if (ProtocolCodec::decode_security_question_request(packet.data, req)) {
+                handle_security_question(conn, req);
+            }
+            break;
+        }
+        case CommandCode::RESET_PASSWORD_REQ: {
+            ResetPasswordRequest req;
+            if (ProtocolCodec::decode_reset_password_request(packet.data, req)) {
+                handle_reset_password(conn, req);
             }
             break;
         }
@@ -206,6 +228,121 @@ void MessageHandler::handle_add_friend(std::shared_ptr<Connection> conn, const A
     resp.error_code = ErrorCode::SUCCESS;
     LOG("add_friend OK uid=" << user_id << " friend=" << req.friend_id);
     send_response(conn, CommandCode::ADD_FRIEND_RESP, ProtocolCodec::encode_add_friend_response(resp));
+}
+
+void MessageHandler::handle_register(std::shared_ptr<Connection> conn, const RegisterRequest& req) {
+    RegisterResponse resp;
+    
+    if (req.username.empty() || req.password.empty() || req.security_question.empty() || req.security_answer.empty()) {
+        LOG("register FAIL username=" << req.username << " reason=INVALID_REQUEST");
+        resp.error_code = ErrorCode::INVALID_REQUEST;
+        resp.user_id = 0;
+        send_response(conn, CommandCode::REGISTER_RESP, ProtocolCodec::encode_register_response(resp));
+        return;
+    }
+    
+    if (db_pool_->username_exists(req.username)) {
+        LOG("register FAIL username=" << req.username << " reason=USERNAME_EXISTS");
+        resp.error_code = ErrorCode::USERNAME_EXISTS;
+        resp.user_id = 0;
+        send_response(conn, CommandCode::REGISTER_RESP, ProtocolCodec::encode_register_response(resp));
+        return;
+    }
+    
+    std::string password_hash = sha256(req.password);
+    std::string answer_hash = sha256(req.security_answer);
+    int user_id = 0;
+    
+    if (!db_pool_->register_user(req.username, password_hash, req.security_question, answer_hash, user_id)) {
+        LOG("register FAIL username=" << req.username << " reason=DB_ERROR");
+        resp.error_code = ErrorCode::DATABASE_ERROR;
+        resp.user_id = 0;
+        send_response(conn, CommandCode::REGISTER_RESP, ProtocolCodec::encode_register_response(resp));
+        return;
+    }
+    
+    LOG("register OK uid=" << user_id << " username=" << req.username);
+    resp.error_code = ErrorCode::SUCCESS;
+    resp.user_id = user_id;
+    send_response(conn, CommandCode::REGISTER_RESP, ProtocolCodec::encode_register_response(resp));
+}
+
+void MessageHandler::handle_security_question(std::shared_ptr<Connection> conn, const SecurityQuestionRequest& req) {
+    SecurityQuestionResponse resp;
+    
+    if (req.username.empty()) {
+        LOG("security_question FAIL username=empty reason=INVALID_REQUEST");
+        resp.error_code = ErrorCode::INVALID_REQUEST;
+        resp.question = "";
+        send_response(conn, CommandCode::SECURITY_QUESTION_RESP, ProtocolCodec::encode_security_question_response(resp));
+        return;
+    }
+    
+    std::string question, answer_hash;
+    if (!db_pool_->get_security_question(req.username, question, answer_hash)) {
+        LOG("security_question FAIL username=" << req.username << " reason=USER_NOT_FOUND");
+        resp.error_code = ErrorCode::USER_NOT_FOUND;
+        resp.question = "";
+        send_response(conn, CommandCode::SECURITY_QUESTION_RESP, ProtocolCodec::encode_security_question_response(resp));
+        return;
+    }
+    
+    LOG("security_question OK username=" << req.username);
+    resp.error_code = ErrorCode::SUCCESS;
+    resp.question = question;
+    send_response(conn, CommandCode::SECURITY_QUESTION_RESP, ProtocolCodec::encode_security_question_response(resp));
+}
+
+void MessageHandler::handle_reset_password(std::shared_ptr<Connection> conn, const ResetPasswordRequest& req) {
+    ResetPasswordResponse resp;
+    
+    if (req.username.empty() || req.new_password.empty() || req.security_answer.empty()) {
+        LOG("reset_password FAIL username=" << req.username << " reason=INVALID_REQUEST");
+        resp.error_code = ErrorCode::INVALID_REQUEST;
+        send_response(conn, CommandCode::RESET_PASSWORD_RESP, ProtocolCodec::encode_reset_password_response(resp));
+        return;
+    }
+    
+    std::string question, answer_hash;
+    if (!db_pool_->get_security_question(req.username, question, answer_hash)) {
+        LOG("reset_password FAIL username=" << req.username << " reason=USER_NOT_FOUND");
+        resp.error_code = ErrorCode::USER_NOT_FOUND;
+        send_response(conn, CommandCode::RESET_PASSWORD_RESP, ProtocolCodec::encode_reset_password_response(resp));
+        return;
+    }
+    
+    std::string input_answer_hash = sha256(req.security_answer);
+    if (input_answer_hash != answer_hash) {
+        LOG("reset_password FAIL username=" << req.username << " reason=INVALID_ANSWER");
+        resp.error_code = ErrorCode::INVALID_ANSWER;
+        send_response(conn, CommandCode::RESET_PASSWORD_RESP, ProtocolCodec::encode_reset_password_response(resp));
+        return;
+    }
+    
+    std::string new_password_hash = sha256(req.new_password);
+    if (!db_pool_->reset_password(req.username, new_password_hash)) {
+        LOG("reset_password FAIL username=" << req.username << " reason=DB_ERROR");
+        resp.error_code = ErrorCode::DATABASE_ERROR;
+        send_response(conn, CommandCode::RESET_PASSWORD_RESP, ProtocolCodec::encode_reset_password_response(resp));
+        return;
+    }
+    
+    LOG("reset_password OK username=" << req.username);
+    resp.error_code = ErrorCode::SUCCESS;
+    send_response(conn, CommandCode::RESET_PASSWORD_RESP, ProtocolCodec::encode_reset_password_response(resp));
+}
+
+std::string MessageHandler::sha256(const std::string& str) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256((unsigned char*)str.c_str(), str.length(), hash);
+    std::string result;
+    result.reserve(SHA256_DIGEST_LENGTH * 2);
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+        char buf[3];
+        snprintf(buf, sizeof(buf), "%02x", hash[i]);
+        result += buf;
+    }
+    return result;
 }
 
 void MessageHandler::send_response(std::shared_ptr<Connection> conn, CommandCode command, 
