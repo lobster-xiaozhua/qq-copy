@@ -2,6 +2,7 @@ package com.example.qqchat;
 
 import android.app.DownloadManager;
 import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.util.Log;
@@ -19,7 +20,7 @@ public class UpdateManager {
     private DownloadCallback callback;
 
     public interface DownloadCallback {
-        void onProgress(int progress);
+        void onProgress(int progress, long bytesDownloaded, long bytesTotal);
         void onSuccess(File apkFile);
         void onFailure(String error);
     }
@@ -67,7 +68,8 @@ public class UpdateManager {
                         if (status == DownloadManager.STATUS_SUCCESSFUL) {
                             String uriString = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI));
                             File apkFile = new File(Uri.parse(uriString).getPath());
-                            if (callback != null) { callback.onProgress(100); callback.onSuccess(apkFile); }
+                            long len = apkFile.length();
+                            if (callback != null) { callback.onProgress(100, len, len); callback.onSuccess(apkFile); }
                             cursor.close(); break;
                         } else if (status == DownloadManager.STATUS_FAILED) {
                             int reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON));
@@ -76,7 +78,9 @@ public class UpdateManager {
                         } else if (status == DownloadManager.STATUS_RUNNING || status == DownloadManager.STATUS_PAUSED) {
                             int bytesDown = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
                             int bytesTotal = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
-                            if (bytesTotal > 0 && callback != null) callback.onProgress((int)((bytesDown * 100L) / bytesTotal));
+                            if (bytesTotal > 0 && callback != null) {
+                                callback.onProgress((int)((bytesDown * 100L) / bytesTotal), bytesDown, bytesTotal);
+                            }
                             Thread.sleep(500);
                         } else { Thread.sleep(500); }
                     } else { if (cursor != null) cursor.close(); break; }

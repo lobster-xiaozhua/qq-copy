@@ -108,14 +108,14 @@ public class FriendListActivity extends AppCompatActivity implements ChatService
 
     private void startInAppDownload(String url) {
         downloadDialog = new UpdateDownloadDialog();
-        downloadDialog.setActionListener(() -> { if (updateManager != null) updateManager.cancelDownload(); });
+        downloadDialog.setActionListener(new UpdateDownloadDialog.DownloadActionListener() {
+            @Override public void onCancelled() { if (updateManager != null) updateManager.cancelDownload(); }
+            @Override public void onInstallRequested(File apkFile) { UpdateManager.installApk(FriendListActivity.this, apkFile); }
+        });
         downloadDialog.show(getSupportFragmentManager(), "download_progress");
         updateManager.setCallback(new UpdateManager.DownloadCallback() {
-            @Override public void onProgress(int p) { if (downloadDialog != null) downloadDialog.updateProgress(p); }
-            @Override public void onSuccess(File apkFile) {
-                if (downloadDialog != null) downloadDialog.showSuccess();
-                runOnUiThread(() -> { UpdateManager.installApk(FriendListActivity.this, apkFile); if (downloadDialog != null) downloadDialog.dismiss(); });
-            }
+            @Override public void onProgress(int p, long bDown, long bTotal) { if (downloadDialog != null) downloadDialog.updateProgress(p, bDown, bTotal); }
+            @Override public void onSuccess(File apkFile) { if (downloadDialog != null) downloadDialog.setApkFile(apkFile); }
             @Override public void onFailure(String error) {
                 runOnUiThread(() -> { Toast.makeText(FriendListActivity.this, "下载失败: " + error, Toast.LENGTH_LONG).show(); if (downloadDialog != null) downloadDialog.dismiss(); });
             }
