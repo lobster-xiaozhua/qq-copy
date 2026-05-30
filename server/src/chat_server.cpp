@@ -7,7 +7,7 @@ ChatServer::ChatServer(const std::string& address, short port,
                        std::shared_ptr<DatabasePool> db_pool,
                        std::shared_ptr<CacheManager> cache_manager)
     : io_context_(1),
-      acceptor_(io_context_, tcp::endpoint(boost::asio::ip::address::from_string(address), port)),
+      acceptor_(io_context_, tcp::endpoint(boost::asio::ip::make_address(address), port)),
       connection_manager_(*this),
       db_pool_(db_pool),
       cache_manager_(cache_manager),

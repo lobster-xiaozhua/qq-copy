@@ -1,5 +1,7 @@
 #include "qqchat/database_pool.hpp"
 #include <openssl/sha.h>
+#include <cstring>
+#include <algorithm>
 #include <random>
 #include <sstream>
 
@@ -42,7 +44,7 @@ MYSQL* DatabasePool::create_connection() {
     return conn;
 }
 
-std::unique_ptr<MYSQL, decltype(&mysql_close)> DatabasePool::get_connection() {
+std::unique_ptr<MYSQL, std::function<void(MYSQL*)>> DatabasePool::get_connection() {
     std::unique_lock<std::mutex> lock(mutex_);
     cv_.wait(lock, [this] { return !connections_.empty(); });
     
@@ -54,7 +56,7 @@ std::unique_ptr<MYSQL, decltype(&mysql_close)> DatabasePool::get_connection() {
         conn = create_connection();
     }
     
-    return std::unique_ptr<MYSQL, decltype(&mysql_close)>(conn, [this](MYSQL* c) {
+    return std::unique_ptr<MYSQL, std::function<void(MYSQL*)>>(conn, [this](MYSQL* c) {
         std::lock_guard<std::mutex> lock(mutex_);
         connections_.push(c);
         cv_.notify_one();
@@ -115,17 +117,19 @@ bool DatabasePool::verify_user(const std::string& username, const std::string& p
     result_params[2].buffer_length = 256;
     
     mysql_stmt_bind_result(stmt, result_params);
-    mysql_stmt_fetch(stmt);
+    int fetch_ret = mysql_stmt_fetch(stmt);
     
-    std::string stored_hash(password_hash_buf);
-    std::string input_hash = password;
-    
-    bool match = (stored_hash == input_hash);
-    
-    if (match) {
-        user.user_id = user_id;
-        user.username = username_buf;
-        user.password_hash = stored_hash;
+    bool match = false;
+    if (fetch_ret == 0) {
+        std::string stored_hash(password_hash_buf);
+        std::string input_hash = password;
+        match = (stored_hash == input_hash);
+        
+        if (match) {
+            user.user_id = user_id;
+            user.username = username_buf;
+            user.password_hash = stored_hash;
+        }
     }
     
     mysql_free_result(result);
@@ -337,7 +341,7 @@ bool DatabasePool::get_friends(int user_id, std::vector<Friend>& friends) {
     return true;
 }
 
-bool DatabasePool::send_message(int from_id, int to_id, const std::string& content) {
+bool DatabasePool::send_message(int from_id, int to_id, const std::string& content, int& out_msg_id) {
     auto conn = get_connection();
     if (!conn) return false;
     
@@ -369,6 +373,9 @@ bool DatabasePool::send_message(int from_id, int to_id, const std::string& conte
     }
     
     bool success = (mysql_stmt_execute(stmt) == 0);
+    if (success) {
+        out_msg_id = static_cast<int>(mysql_stmt_insert_id(stmt));
+    }
     mysql_stmt_close(stmt);
     
     return success;

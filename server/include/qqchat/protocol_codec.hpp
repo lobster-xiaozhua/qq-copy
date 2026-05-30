@@ -103,7 +103,6 @@ public:
     static std::vector<uint8_t> encode_friend_list_response(const FriendListResponse& resp);
     static std::vector<uint8_t> encode_add_friend_response(const AddFriendResponse& resp);
     
-private:
     static void write_uint16(std::vector<uint8_t>& buffer, uint16_t value);
     static void write_uint32(std::vector<uint8_t>& buffer, uint32_t value);
     static void write_int32(std::vector<uint8_t>& buffer, int32_t value);
