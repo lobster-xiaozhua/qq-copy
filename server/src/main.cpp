@@ -6,78 +6,83 @@
 #include <chrono>
 #include <ctime>
 #include <sstream>
+#include <memory>
 
-static std::string now_str() {
-    auto now = std::chrono::system_clock::now();
-    auto t = std::chrono::system_clock::to_time_t(now);
-    char buf[32];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&t));
-    return buf;
-}
-
-#define LOG(msg) do { std::ostringstream _os; _os << "[" << now_str() << "] " << msg; std::cout << _os.str() << std::endl; } while(0)
-#define LOG_ERR(msg) do { std::ostringstream _os; _os << "[" << now_str() << "] " << msg; std::cerr << _os.str() << std::endl; } while(0)
-
-std::shared_ptr<qqchat::ChatServer> g_server;
-
-void signal_handler(int signal) {
-    LOG("Signal " << signal << " received, stopping server...");
-    if (g_server) {
-        g_server->stop();
+namespace {
+    std::string now_str() {
+        auto now = std::chrono::system_clock::now();
+        auto t = std::chrono::system_clock::to_time_t(now);
+        char buf[32];
+        std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&t));
+        return buf;
     }
-    exit(0);
-}
 
-std::string trim(const std::string& str) {
-    size_t first = str.find_first_not_of(" \t\r\n");
-    if (first == std::string::npos) return "";
-    size_t last = str.find_last_not_of(" \t\r\n");
-    return str.substr(first, last - first + 1);
-}
-
-static int safe_stoi(const std::string& str, int default_val) {
-    if (str.empty()) return default_val;
-    try {
-        size_t pos = 0;
-        int val = std::stoi(str, &pos);
-        if (pos != str.length()) return default_val;
-        return val;
-    } catch (...) {
-        return default_val;
+    void log_message(const std::string& msg, bool is_error = false) {
+        std::ostream& os = is_error ? std::cerr : std::cout;
+        os << "[" << now_str() << "] " << msg << std::endl;
     }
-}
 
-std::string get_config_value(const std::string& config_file, const std::string& section, const std::string& key) {
-    std::ifstream file(config_file);
-    if (!file.is_open()) {
-        LOG_ERR("Cannot open config file: " << config_file);
-        return "";
+    std::string trim(const std::string& str) {
+        size_t first = str.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos) return "";
+        size_t last = str.find_last_not_of(" \t\r\n");
+        return str.substr(first, last - first + 1);
     }
-    
-    std::string line;
-    std::string current_section;
-    
-    while (std::getline(file, line)) {
-        line = trim(line);
-        if (line.empty() || line[0] == ';' || line[0] == '#') continue;
-        
-        if (line[0] == '[' && line.back() == ']') {
-            current_section = line.substr(1, line.size() - 2);
-            continue;
+
+    int safe_stoi(const std::string& str, int default_val) {
+        if (str.empty()) return default_val;
+        try {
+            size_t pos = 0;
+            int val = std::stoi(str, &pos);
+            if (pos != str.length()) return default_val;
+            return val;
+        } catch (...) {
+            return default_val;
+        }
+    }
+
+    std::string get_config_value(const std::string& config_file, const std::string& section, const std::string& key) {
+        std::ifstream file(config_file);
+        if (!file.is_open()) {
+            log_message("Cannot open config file: " + config_file, true);
+            return "";
         }
         
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string k = trim(line.substr(0, pos));
-            std::string v = trim(line.substr(pos + 1));
+        std::string line;
+        std::string current_section;
+        
+        while (std::getline(file, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == ';' || line[0] == '#') continue;
             
-            if (current_section == section && k == key) {
-                return v;
+            if (line[0] == '[' && line.back() == ']') {
+                current_section = line.substr(1, line.size() - 2);
+                continue;
+            }
+            
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string k = trim(line.substr(0, pos));
+                std::string v = trim(line.substr(pos + 1));
+                
+                if (current_section == section && k == key) {
+                    return v;
+                }
             }
         }
+        
+        return "";
     }
-    
-    return "";
+
+    std::shared_ptr<qqchat::ChatServer> g_server;
+
+    void signal_handler(int signal) {
+        log_message("Signal " + std::to_string(signal) + " received, stopping server...");
+        if (g_server) {
+            g_server->stop();
+        }
+        std::exit(0);
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -101,12 +106,12 @@ int main(int argc, char* argv[]) {
     std::string redis_port_str = get_config_value(config_file, "redis", "port");
     int redis_port = safe_stoi(redis_port_str, 6379);
     
-    LOG("=====================================");
-    LOG("  QQChat Server v1.0");
-    LOG("  Port: " << port);
-    LOG("  MySQL: " << mysql_host << ":" << mysql_port << "/" << mysql_db);
-    LOG("  Redis: " << redis_host << ":" << redis_port);
-    LOG("=====================================");
+    log_message("=====================================");
+    log_message("  QQChat Server v1.0");
+    log_message("  Port: " + std::to_string(port));
+    log_message("  MySQL: " + mysql_host + ":" + std::to_string(mysql_port) + "/" + mysql_db);
+    log_message("  Redis: " + redis_host + ":" + std::to_string(redis_port));
+    log_message("=====================================");
     
     try {
         auto db_pool = std::make_shared<qqchat::DatabasePool>(
@@ -116,15 +121,15 @@ int main(int argc, char* argv[]) {
         
         g_server = std::make_shared<qqchat::ChatServer>(host.empty() ? "0.0.0.0" : host, port, db_pool, cache_manager);
         
-        signal(SIGINT, signal_handler);
-        signal(SIGTERM, signal_handler);
+        std::signal(SIGINT, signal_handler);
+        std::signal(SIGTERM, signal_handler);
         
-        LOG("Server started successfully, listening on " << (host.empty() ? "0.0.0.0" : host) << ":" << port);
-        LOG("Press Ctrl+C to stop.");
+        log_message("Server started successfully, listening on " + (host.empty() ? "0.0.0.0" : host) + ":" + std::to_string(port));
+        log_message("Press Ctrl+C to stop.");
         
         g_server->run();
     } catch (const std::exception& e) {
-        LOG_ERR("Server fatal error: " << e.what());
+        log_message("Server fatal error: " + std::string(e.what()), true);
         return 1;
     }
     

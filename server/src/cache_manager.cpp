@@ -26,7 +26,7 @@ redisReply* CacheManager::safe_command(const char* fmt, ...) {
     if (!ctx_) return nullptr;
     va_list args;
     va_start(args, fmt);
-    redisReply* reply = (redisReply*)redisCommand(ctx_, fmt, args);
+    redisReply* reply = (redisReply*)redisvCommand(ctx_, fmt, args);
     va_end(args);
     return reply;
 }

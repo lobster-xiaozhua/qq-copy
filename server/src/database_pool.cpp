@@ -139,7 +139,7 @@ bool DatabasePool::verify_user(const std::string& username, const std::string& p
     return match;
 }
 
-std::string sha256(const std::string& str) {
+static std::string sha256(const std::string& str) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256((unsigned char*)str.c_str(), str.length(), hash);
     std::string result;
