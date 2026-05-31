@@ -72,7 +72,7 @@ target_link_directories(qqchat_server
         ${HIREDIS_LIBRARY_DIRS}
 )
 
-target_link_libraries(qchat_server
+target_link_libraries(qqchat_server
     PRIVATE
         Boost::system
         Boost::thread

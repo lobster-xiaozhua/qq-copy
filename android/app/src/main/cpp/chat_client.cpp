@@ -205,20 +205,36 @@ void ChatClient::handle_packet(const std::vector<uint8_t>& packet) {
     }
 }
 
+namespace {
+    bool send_all(int fd, const void* data, size_t len) {
+        const uint8_t* ptr = static_cast<const uint8_t*>(data);
+        size_t remaining = len;
+        while (remaining > 0) {
+            ssize_t sent = ::send(fd, ptr, remaining, MSG_NOSIGNAL);
+            if (sent == -1) {
+                return false;
+            }
+            ptr += sent;
+            remaining -= sent;
+        }
+        return true;
+    }
+}
+
 void ChatClient::login(const std::string& username, const std::string& password, LoginCallback callback) {
     std::lock_guard<std::mutex> lock(callback_mutex_);
     login_callback_ = callback;
     
     if (socket_fd_ != -1) {
         std::vector<uint8_t> packet = ProtocolCodec::encode_login_request(username, password);
-        send(socket_fd_, packet.data(), packet.size(), 0);
+        send_all(socket_fd_, packet.data(), packet.size());
     }
 }
 
 void ChatClient::send_message(int to_id, const std::string& content) {
     if (socket_fd_ != -1) {
         std::vector<uint8_t> packet = ProtocolCodec::encode_message_request(to_id, content);
-        send(socket_fd_, packet.data(), packet.size(), 0);
+        send_all(socket_fd_, packet.data(), packet.size());
     }
 }
 
@@ -228,14 +244,14 @@ void ChatClient::get_friend_list(FriendListCallback callback) {
     
     if (socket_fd_ != -1) {
         std::vector<uint8_t> packet = ProtocolCodec::encode_friend_list_request();
-        send(socket_fd_, packet.data(), packet.size(), 0);
+        send_all(socket_fd_, packet.data(), packet.size());
     }
 }
 
 void ChatClient::add_friend(int friend_id) {
     if (socket_fd_ != -1) {
         std::vector<uint8_t> packet = ProtocolCodec::encode_add_friend_request(friend_id);
-        send(socket_fd_, packet.data(), packet.size(), 0);
+        send_all(socket_fd_, packet.data(), packet.size());
     }
 }
 
@@ -247,7 +263,7 @@ void ChatClient::register_user(const std::string& username, const std::string& p
     
     if (socket_fd_ != -1) {
         std::vector<uint8_t> packet = ProtocolCodec::encode_register_request(username, password, security_question, security_answer);
-        send(socket_fd_, packet.data(), packet.size(), 0);
+        send_all(socket_fd_, packet.data(), packet.size());
     }
 }
 
@@ -257,7 +273,7 @@ void ChatClient::get_security_question(const std::string& username, SecurityQues
     
     if (socket_fd_ != -1) {
         std::vector<uint8_t> packet = ProtocolCodec::encode_security_question_request(username);
-        send(socket_fd_, packet.data(), packet.size(), 0);
+        send_all(socket_fd_, packet.data(), packet.size());
     }
 }
 
@@ -268,7 +284,7 @@ void ChatClient::reset_password(const std::string& username, const std::string& 
     
     if (socket_fd_ != -1) {
         std::vector<uint8_t> packet = ProtocolCodec::encode_reset_password_request(username, new_password, security_answer);
-        send(socket_fd_, packet.data(), packet.size(), 0);
+        send_all(socket_fd_, packet.data(), packet.size());
     }
 }
 
@@ -278,7 +294,7 @@ void ChatClient::check_version(int client_version, VersionCheckCallback callback
     
     if (socket_fd_ != -1) {
         std::vector<uint8_t> packet = ProtocolCodec::encode_version_check_request(client_version);
-        send(socket_fd_, packet.data(), packet.size(), 0);
+        send_all(socket_fd_, packet.data(), packet.size());
     }
 }
 

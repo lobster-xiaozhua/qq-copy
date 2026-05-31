@@ -92,7 +92,12 @@ Connection::Connection(tcp::socket socket, ConnectionManager& manager, ChatServe
     header_buffer_.resize(ProtocolCodec::HEADER_SIZE);
 }
 
-Connection::~Connection() {}
+Connection::~Connection() {
+    if (socket_.is_open()) {
+        boost::system::error_code ec;
+        socket_.close(ec);
+    }
+}
 
 void Connection::start() {
     do_read_header();
